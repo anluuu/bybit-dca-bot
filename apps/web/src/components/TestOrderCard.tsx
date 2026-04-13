@@ -212,7 +212,7 @@ export function TestOrderCard({ pair }: TestOrderCardProps) {
             />
           </div>
 
-          {slippagePct !== null && (
+          {result.status === "filled" && slippagePct !== null && (
             <div className="mt-3 flex items-center justify-between border-t border-surface-700/30 pt-3">
               <span className="text-xs text-surface-400">
                 Slippage vs preview
@@ -229,6 +229,17 @@ export function TestOrderCard({ pair }: TestOrderCardProps) {
                 {slippagePct >= 0 ? "+" : ""}
                 {slippagePct.toFixed(3)}%
               </span>
+            </div>
+          )}
+
+          {result.status !== "filled" && result.errorMessage && (
+            <div className="mt-3 border-t border-surface-700/30 pt-3">
+              <p className="text-[10px] uppercase tracking-wider text-surface-500">
+                Error from Bybit
+              </p>
+              <p className="mt-1 break-words font-mono text-xs leading-relaxed text-red-loss">
+                {result.errorMessage}
+              </p>
             </div>
           )}
         </div>

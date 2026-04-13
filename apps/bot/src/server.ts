@@ -447,6 +447,7 @@ export async function startServer(redisConnection: Redis) {
           fiatSpent: row.fiatSpent,
           fee: row.fee,
           feeCurrency: row.feeCurrency,
+          errorMessage: row.errorMessage,
           executedAt: row.executedAt.toISOString(),
         };
       } catch (error) {

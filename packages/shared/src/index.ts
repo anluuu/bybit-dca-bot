@@ -59,6 +59,7 @@ export interface TestOrderResult {
   fiatSpent: string | null;
   fee: string | null;
   feeCurrency: string | null;
+  errorMessage: string | null;
   executedAt: string;
 }
 
