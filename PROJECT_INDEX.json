@@ -1,0 +1,161 @@
+{
+  "project": "bybit-dca-bot",
+  "generated": "2026-04-13",
+  "description": "Bitcoin DCA bot for Bybit (~250 BRL/week of BTC). Turborepo monorepo: Fastify+BullMQ backend, React+Vite dashboard, shared types. Dokploy/Traefik/nginx deployment.",
+  "type": "turborepo-monorepo",
+  "packageManager": "pnpm@10.30.2",
+  "workspaces": {
+    "@dca/bot": {
+      "path": "apps/bot",
+      "role": "Fastify + BullMQ + Drizzle service",
+      "entry": "src/index.ts",
+      "port": 3000,
+      "publiclyExposed": false,
+      "scripts": {
+        "dev": "tsx watch src/index.ts",
+        "build": "tsc",
+        "start": "node dist/index.js",
+        "db:generate": "drizzle-kit generate",
+        "db:migrate": "tsx src/db/migrate.ts"
+      },
+      "modules": {
+        "src/index.ts": { "purpose": "Boot: migrate → seed → telegram → redis/bullmq → jobs → fastify → shutdown" },
+        "src/strategy.ts": { "purpose": "DCA orchestration (limit→poll→market fallback)", "exports": ["executeDca", "executeTestOrder"] },
+        "src/exchange.ts": { "purpose": "Bybit V5 signed client", "exports": ["getTickerPrice", "placeLimitOrder", "placeMarketOrder", "cancelOrder", "getOrderDetail", "getSpotBalance", "ExchangeApiError", "ExchangeClientError", "OrderDetail"] },
+        "src/queue.ts": { "purpose": "BullMQ queue + worker; retries attempts:3 backoff:fixed 300s", "exports": ["createRedisConnection", "setupQueue", "registerJobs"] },
+        "src/server.ts": { "purpose": "Fastify: cors, cookies, csrf, jwt, rate-limit, routes", "exports": ["startServer"] },
+        "src/config.ts": { "purpose": "Zod env validation", "exports": ["config"] },
+        "src/logger.ts": { "purpose": "Structured JSON logs with secret redaction", "exports": ["logger"] },
+        "src/notifications.ts": { "purpose": "Telegraf fire-and-forget notifications", "exports": ["initBot", "notifySuccess", "notifyFailure", "notifyCapReached", "notifyFallback", "OrderResult"] },
+        "src/spending.ts": { "purpose": "Monthly spent aggregator for cap enforcement", "exports": ["getMonthlySpent"] },
+        "src/db/client.ts": { "exports": ["db", "sql"] },
+        "src/db/schema.ts": { "exports": ["assets", "orders", "Asset", "NewAsset", "Order", "NewOrder"] },
+        "src/db/migrate.ts": { "exports": ["runMigrations"] }
+      },
+      "routes": {
+        "public": [
+          "GET /health",
+          "GET /health/ready",
+          "GET /api/public/summary",
+          "GET /api/public/chart",
+          "POST /api/auth/login (5/min)",
+          "POST /api/auth/logout",
+          "GET /api/auth/me"
+        ],
+        "admin": [
+          "GET /api/orders",
+          "GET /api/orders/summary",
+          "GET /api/assets",
+          "POST /api/test/preview (10/min)",
+          "POST /api/test/execute (2/min)"
+        ]
+      },
+      "dependencies": {
+        "fastify": "^5.8.4",
+        "bullmq": "^5.73.5",
+        "drizzle-orm": "^0.45.2",
+        "postgres": "^3.4.9",
+        "ioredis": "^5.10.1",
+        "axios": "^1.15.0",
+        "telegraf": "^4.16.3",
+        "zod": "^4.3.6",
+        "bcryptjs": "^3.0.3",
+        "@fastify/jwt": "^10.0.0",
+        "@fastify/cors": "^11.2.0",
+        "@fastify/cookie": "^11.0.2",
+        "@fastify/csrf-protection": "^7.1.0",
+        "@fastify/rate-limit": "^10.3.0"
+      }
+    },
+    "@dca/web": {
+      "path": "apps/web",
+      "role": "React 19 + Vite dashboard; nginx in prod proxies /api/* and /health/* to bot:3000",
+      "entry": "src/main.tsx",
+      "scripts": { "dev": "vite", "build": "tsc && vite build", "preview": "vite preview" },
+      "modules": {
+        "src/App.tsx": { "purpose": "Root; TanStack Query (30s refetch); admin+public views" },
+        "src/lib/auth.tsx": { "exports": ["AuthProvider", "useAuth"] },
+        "src/lib/api.ts": { "purpose": "Re-exports @dca/shared types — do not redefine types here" },
+        "src/components/StatusCard.tsx": "Health + last order",
+        "src/components/SpendingCard.tsx": "Monthly spend vs cap",
+        "src/components/AccumulationChart.tsx": "Recharts cumulative chart",
+        "src/components/OrdersTable.tsx": "Paginated order history",
+        "src/components/TestOrderCard.tsx": "Admin test order preview+execute",
+        "src/components/LoginPage.tsx": "Admin login",
+        "src/components/ErrorBoundary.tsx": "Class component (only one)"
+      },
+      "conventions": {
+        "dataFetching": "TanStack Query only — no useEffect fetching",
+        "icons": "Lucide only, no emoji icons",
+        "typography": "JetBrains Mono for numbers, DM Sans otherwise",
+        "styling": "Tailwind v4 tokens in src/index.css"
+      },
+      "dependencies": {
+        "react": "^19.2.5",
+        "@tanstack/react-query": "^5.99.0",
+        "@tanstack/react-router": "^1.168.18",
+        "recharts": "^3.8.1",
+        "lucide-react": "^1.8.0",
+        "tailwindcss": "^4.2.2",
+        "vite": "^8.0.4"
+      }
+    },
+    "@dca/shared": {
+      "path": "packages/shared",
+      "role": "Wire-format TS types shared between bot and web (zero runtime deps)",
+      "entry": "src/index.ts",
+      "exports": ["Order", "OrderType", "OrderStatus", "Asset", "OrdersPage", "OrdersSummary", "ChartPoint", "HealthStatus", "AuthUser", "TestOrderPreview", "TestOrderResult"],
+      "buildStep": "pnpm --filter @dca/shared build (required after edits)"
+    }
+  },
+  "database": {
+    "engine": "postgres",
+    "orm": "drizzle (postgres-js driver)",
+    "tables": {
+      "assets": ["id", "pair(uniq)", "buy_amount", "monthly_cap", "cron_schedule", "limit_discount=0.300", "limit_wait_mins=120", "enabled=true", "created_at", "updated_at"],
+      "orders": ["id", "asset_id→assets", "pair", "order_type", "bybit_order_id", "status", "price", "quantity", "fiat_spent", "fee", "fee_currency", "error_message", "is_test=false", "executed_at", "created_at"]
+    },
+    "indexes": ["idx_orders_pair_executed_at", "idx_orders_asset_id", "idx_orders_status"],
+    "migrations": ["apps/bot/drizzle/migrations/0000_wise_venom.sql", "apps/bot/drizzle/migrations/0001_familiar_giant_man.sql"],
+    "migrationWorkflow": "edit schema.ts → pnpm db:generate → commit generated SQL (never hand-edit)"
+  },
+  "infra": {
+    "docker-compose.yml": "prod stack: bot(internal), web(nginx+Traefik labels dca-bot.luancunha.dev), postgres, redis; joins external dokploy-network",
+    "docker-compose.dev.yml": "local postgres+redis only",
+    "nginx": "apps/web/nginx.conf — serves static, proxies /api/* and /health/* to bot:3000",
+    "deployment": "Dokploy + Traefik + Let's Encrypt; build from repo root with -f apps/<app>/Dockerfile"
+  },
+  "env": {
+    "required": ["BYBIT_API_KEY", "BYBIT_API_SECRET", "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "DATABASE_URL", "REDIS_URL", "ADMIN_USERNAME", "ADMIN_PASSWORD(>=8)", "JWT_SECRET(>=32)"],
+    "tuning": ["BUY_AMOUNT_BRL=250", "MONTHLY_CAP_BRL=1000", "CRON_SCHEDULE=0 8 * * 0", "LIMIT_DISCOUNT_PCT=0.3", "LIMIT_WAIT_MINUTES=120", "TRADING_PAIR=BTCBRL", "TEST_ORDER_AMOUNT_BRL=10", "PORT=3000"],
+    "addingVar": "update config.ts (zod) + .env.example + docker-compose.yml + README"
+  },
+  "tests": { "present": false, "planned": "Vitest — backlog P2" },
+  "criticalRules": [
+    "Bot never publicly exposed (no ports: mapping)",
+    "DCA must not skip for DB failures — trade first, record second",
+    "Telegram failures must never block DCA",
+    "No src/lib/ or src/utils/ directories — flat modules",
+    "No generic withRetry helper — BullMQ handles retries",
+    "No mock-data fallback on API failure in frontend",
+    "Never redefine @dca/shared types in web",
+    "Never hand-edit drizzle/migrations/*.sql",
+    "Never bypass authPreHandler on admin endpoints",
+    "Adding a new coin = INSERT INTO assets, not code"
+  ],
+  "docs": {
+    "CLAUDE.md": "AI assistant context (authoritative)",
+    "REQUIREMENTS.md": "What the bot does",
+    "ARCHITECTURE.md": "How it works (deepest reference)",
+    "README.md": "Deployment + config tables",
+    "WORKFLOW.md": "Historical build notes"
+  },
+  "quickStart": [
+    "pnpm install",
+    "pnpm dev:db",
+    "cp .env.example .env && fill secrets",
+    "pnpm dev",
+    "pnpm typecheck",
+    "pnpm build"
+  ]
+}
