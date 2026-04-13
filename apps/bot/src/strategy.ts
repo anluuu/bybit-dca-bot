@@ -34,10 +34,16 @@ async function waitForOrderFill(
   for (let i = 0; i < maxAttempts; i++) {
     if (i > 0) await sleep(delayMs);
     const detail = await getOrderDetail(pair, orderId);
-    if (detail.status === "Filled" || detail.status === "PartiallyFilledCanceled") {
+    if (
+      detail.orderStatus === "Filled" ||
+      detail.orderStatus === "PartiallyFilledCanceled"
+    ) {
       return detail;
     }
-    if (detail.status === "Cancelled" || detail.status === "Rejected") {
+    if (
+      detail.orderStatus === "Cancelled" ||
+      detail.orderStatus === "Rejected"
+    ) {
       return detail;
     }
   }
@@ -132,7 +138,7 @@ export async function executeDca(asset: Asset): Promise<void> {
 
     const detail = await getOrderDetail(pair, limitOrderId);
 
-    if (detail.status === "Filled") {
+    if (detail.orderStatus === "Filled") {
       await db
         .update(orders)
         .set({
@@ -152,14 +158,14 @@ export async function executeDca(asset: Asset): Promise<void> {
 
     // Handle external cancellation or rejection
     if (
-      detail.status === "Cancelled" ||
-      detail.status === "Rejected" ||
-      detail.status === "PartiallyFilledCanceled"
+      detail.orderStatus === "Cancelled" ||
+      detail.orderStatus === "Rejected" ||
+      detail.orderStatus === "PartiallyFilledCanceled"
     ) {
       logger.warn("Limit order ended externally", {
         pair,
         orderId: limitOrderId,
-        status: detail.status,
+        status: detail.orderStatus,
       });
 
       await db
@@ -175,7 +181,7 @@ export async function executeDca(asset: Asset): Promise<void> {
       orderId: limitOrderId,
       poll: i + 1,
       maxPolls,
-      status: detail.status,
+      status: detail.orderStatus,
     });
   }
 
@@ -217,8 +223,8 @@ export async function executeDca(asset: Asset): Promise<void> {
   const marketDetail = await waitForOrderFill(pair, marketOrderId, 5, 2_000);
 
   const isFilled =
-    marketDetail.status === "Filled" ||
-    (marketDetail.status === "PartiallyFilledCanceled" &&
+    marketDetail.orderStatus === "Filled" ||
+    (marketDetail.orderStatus === "PartiallyFilledCanceled" &&
       parseFloat(marketDetail.cumExecQty) > 0);
 
   await db.insert(orders).values({
@@ -241,7 +247,7 @@ export async function executeDca(asset: Asset): Promise<void> {
       orderId: marketOrderId,
     });
   } else {
-    const errorMsg = `Market order not filled: status=${marketDetail.status}`;
+    const errorMsg = `Market order not filled: orderStatus=${marketDetail.orderStatus}`;
     await notifyFailure(errorMsg, pair);
     throw new Error(errorMsg);
   }
@@ -293,8 +299,8 @@ export async function executeTestOrder(
   const detail = await waitForOrderFill(pair, marketOrderId, 5, 2_000);
 
   const isFilled =
-    detail.status === "Filled" ||
-    (detail.status === "PartiallyFilledCanceled" &&
+    detail.orderStatus === "Filled" ||
+    (detail.orderStatus === "PartiallyFilledCanceled" &&
       parseFloat(detail.cumExecQty) > 0);
 
   const [row] = await db
@@ -312,7 +318,7 @@ export async function executeTestOrder(
       feeCurrency: detail.feeCurrency,
       errorMessage: isFilled
         ? null
-        : `Test order did not fill: status=${detail.status}`,
+        : `Test order did not fill: orderStatus=${detail.orderStatus}`,
       isTest: true,
     })
     .returning();

@@ -34,7 +34,11 @@ interface BybitResponse<T = unknown> {
 }
 
 export interface OrderDetail {
-  status: string;
+  // Bybit V5 returns the field as `orderStatus` — NOT `status`. Using the
+  // wrong name silently yields `undefined`, making every fill look like a
+  // failure. Trips on this previously caused test orders to be marked
+  // failed even when the trade actually settled on the exchange.
+  orderStatus: string;
   price: string;
   qty: string;
   avgPrice: string;
