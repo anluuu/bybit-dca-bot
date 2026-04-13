@@ -47,6 +47,7 @@ export const orders = pgTable(
     fee: numeric("fee", { precision: 20, scale: 8 }),
     feeCurrency: varchar("fee_currency", { length: 10 }),
     errorMessage: text("error_message"),
+    isTest: boolean("is_test").notNull().default(false),
     executedAt: timestamp("executed_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

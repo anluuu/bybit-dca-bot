@@ -1,6 +1,6 @@
 import { UnrecoverableError } from "bullmq";
 import { db } from "./db/client.js";
-import { orders, type Asset } from "./db/schema.js";
+import { orders, type Asset, type Order } from "./db/schema.js";
 import { eq } from "drizzle-orm";
 import {
   getTickerPrice,
@@ -9,6 +9,7 @@ import {
   cancelOrder,
   getOrderDetail,
   ExchangeClientError,
+  ExchangeApiError,
   type OrderDetail,
 } from "./exchange.js";
 import { getMonthlySpent } from "./spending.js";
@@ -244,4 +245,83 @@ export async function executeDca(asset: Asset): Promise<void> {
     await notifyFailure(errorMsg, pair);
     throw new Error(errorMsg);
   }
+}
+
+/**
+ * Execute a small *test* market order. Tagged is_test=true so it's excluded
+ * from monthly-cap accounting and public/admin summary aggregates. Does NOT
+ * send Telegram notifications — this is an admin-triggered sanity check, not
+ * a real DCA event.
+ *
+ * Always uses a market order (no limit fallback) so feedback is immediate.
+ * The caller is expected to have already checked for in-flight orders on the
+ * same pair.
+ */
+export async function executeTestOrder(
+  asset: Asset,
+  amountBrl: number
+): Promise<Order> {
+  const { pair, id: assetId } = asset;
+  logger.info("Starting test order", { pair, amountBrl });
+
+  let marketOrderId: string;
+  try {
+    marketOrderId = await placeMarketOrder(pair, amountBrl.toFixed(2));
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    const [failedRow] = await db
+      .insert(orders)
+      .values({
+        assetId,
+        pair,
+        orderType: "market",
+        status: "failed",
+        errorMessage: msg,
+        isTest: true,
+      })
+      .returning();
+
+    if (
+      error instanceof ExchangeClientError ||
+      error instanceof ExchangeApiError
+    ) {
+      return failedRow;
+    }
+    throw error;
+  }
+
+  const detail = await waitForOrderFill(pair, marketOrderId, 5, 2_000);
+
+  const isFilled =
+    detail.status === "Filled" ||
+    (detail.status === "PartiallyFilledCanceled" &&
+      parseFloat(detail.cumExecQty) > 0);
+
+  const [row] = await db
+    .insert(orders)
+    .values({
+      assetId,
+      pair,
+      orderType: "market",
+      bybitOrderId: marketOrderId,
+      status: isFilled ? "filled" : "failed",
+      price: detail.avgPrice,
+      quantity: detail.cumExecQty,
+      fiatSpent: parseFloat(detail.cumExecValue).toFixed(2),
+      fee: detail.cumExecFee,
+      feeCurrency: detail.feeCurrency,
+      errorMessage: isFilled
+        ? null
+        : `Test order did not fill: status=${detail.status}`,
+      isTest: true,
+    })
+    .returning();
+
+  logger.info("Test order finished", {
+    pair,
+    orderId: marketOrderId,
+    status: row.status,
+  });
+
+  return row;
 }

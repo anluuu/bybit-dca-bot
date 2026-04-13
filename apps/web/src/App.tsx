@@ -5,6 +5,7 @@ import { StatusCard } from "./components/StatusCard.tsx";
 import { SpendingCard } from "./components/SpendingCard.tsx";
 import { AccumulationChart } from "./components/AccumulationChart.tsx";
 import { OrdersTable } from "./components/OrdersTable.tsx";
+import { TestOrderCard } from "./components/TestOrderCard.tsx";
 import { LoginPage } from "./components/LoginPage.tsx";
 import { ErrorBoundary } from "./components/ErrorBoundary.tsx";
 import { AuthProvider, useAuth } from "./lib/auth.tsx";
@@ -167,6 +168,12 @@ function AdminDashboard() {
         <div className="mb-6 grid gap-6 md:grid-cols-2">
           <StatusCard health={health} asset={assets?.[0]} />
           <SpendingCard summary={summary} />
+        </div>
+      )}
+
+      {assets?.[0] && (
+        <div className="mb-6">
+          <TestOrderCard pair={assets[0].pair} />
         </div>
       )}
 

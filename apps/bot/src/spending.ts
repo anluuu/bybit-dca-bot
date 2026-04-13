@@ -19,6 +19,7 @@ export async function getMonthlySpent(pair: string): Promise<number> {
     .where(
       sql`${orders.pair} = ${pair}
         AND ${orders.status} = 'filled'
+        AND ${orders.isTest} = false
         AND ${orders.executedAt} >= ${startOfMonth.toISOString()}
         AND ${orders.executedAt} < ${startOfNextMonth.toISOString()}`
     );

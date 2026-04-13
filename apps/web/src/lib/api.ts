@@ -9,4 +9,6 @@ export type {
   ChartPoint,
   HealthStatus,
   AuthUser,
+  TestOrderPreview,
+  TestOrderResult,
 } from "@dca/shared";

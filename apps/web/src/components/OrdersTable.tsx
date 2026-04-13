@@ -130,7 +130,14 @@ export function OrdersTable({
                   {formatDate(order.executedAt)}
                 </td>
                 <td className="px-3 py-3 font-mono text-xs font-medium text-surface-100">
-                  {order.pair}
+                  <span className="inline-flex items-center gap-1.5">
+                    {order.pair}
+                    {order.isTest && (
+                      <span className="rounded border border-violet-tech/30 bg-violet-tech/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-violet-tech">
+                        test
+                      </span>
+                    )}
+                  </span>
                 </td>
                 <td className="px-3 py-3">
                   <span

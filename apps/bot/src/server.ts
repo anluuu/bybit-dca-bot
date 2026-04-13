@@ -14,6 +14,9 @@ import { db } from "./db/client.js";
 import { sql as pgClient } from "./db/client.js";
 import { assets, orders } from "./db/schema.js";
 import { logger } from "./logger.js";
+import { executeTestOrder } from "./strategy.js";
+import { getTickerPrice, ExchangeClientError } from "./exchange.js";
+import { getMonthlySpent } from "./spending.js";
 
 const startTime = Date.now();
 
@@ -179,7 +182,7 @@ export async function startServer(redisConnection: Redis) {
         avgPrice: sql<string>`COALESCE(AVG(${orders.price}), 0)`,
       })
       .from(orders)
-      .where(sql`${orders.status} = 'filled'`);
+      .where(sql`${orders.status} = 'filled' AND ${orders.isTest} = false`);
 
     const monthly = await db
       .select({
@@ -188,6 +191,7 @@ export async function startServer(redisConnection: Redis) {
       .from(orders)
       .where(
         sql`${orders.status} = 'filled'
+          AND ${orders.isTest} = false
           AND ${orders.executedAt} >= ${startOfMonth.toISOString()}
           AND ${orders.executedAt} < ${startOfNextMonth.toISOString()}`
       );
@@ -212,7 +216,7 @@ export async function startServer(redisConnection: Redis) {
         fiatSpent: orders.fiatSpent,
       })
       .from(orders)
-      .where(sql`${orders.status} = 'filled'`)
+      .where(sql`${orders.status} = 'filled' AND ${orders.isTest} = false`)
       .orderBy(orders.executedAt);
 
     let cumulativeBtc = 0;
@@ -282,7 +286,7 @@ export async function startServer(redisConnection: Redis) {
         avgPrice: sql<string>`COALESCE(AVG(${orders.price}), 0)`,
       })
       .from(orders)
-      .where(sql`${orders.status} = 'filled'`);
+      .where(sql`${orders.status} = 'filled' AND ${orders.isTest} = false`);
 
     const monthly = await db
       .select({
@@ -291,6 +295,7 @@ export async function startServer(redisConnection: Redis) {
       .from(orders)
       .where(
         sql`${orders.status} = 'filled'
+          AND ${orders.isTest} = false
           AND ${orders.executedAt} >= ${startOfMonth.toISOString()}
           AND ${orders.executedAt} < ${startOfNextMonth.toISOString()}`
       );
@@ -310,6 +315,150 @@ export async function startServer(redisConnection: Redis) {
   app.get("/api/assets", authPreHandler, async () => {
     return db.select().from(assets);
   });
+
+  // --- Test order endpoints (admin-only, operator sanity-check) ---
+  //
+  // Test orders execute a small real market buy (TEST_ORDER_AMOUNT_BRL) to
+  // validate the end-to-end pipeline between weekly DCAs. They're tagged
+  // is_test=true and excluded from monthly-cap accounting and dashboard
+  // aggregates.
+
+  const testBodySchema = z.object({
+    pair: z.string().min(1).max(20),
+  });
+
+  /**
+   * Return true if there's an in-flight (pending) order on this pair recently,
+   * which would indicate a real DCA job is mid-execution. Test orders must not
+   * race with the real worker.
+   */
+  async function findBusyReason(pair: string): Promise<string | null> {
+    const tenMinAgo = new Date(Date.now() - 10 * 60_000).toISOString();
+    const pending = await db
+      .select({ id: orders.id })
+      .from(orders)
+      .where(
+        sql`${orders.pair} = ${pair}
+          AND ${orders.status} = 'pending'
+          AND ${orders.executedAt} >= ${tenMinAgo}`
+      )
+      .limit(1);
+
+    if (pending.length > 0) {
+      return "Another order is already in flight for this pair. Wait for it to finish.";
+    }
+    return null;
+  }
+
+  app.post(
+    "/api/test/preview",
+    {
+      ...authPreHandler,
+      config: { rateLimit: { max: 10, timeWindow: "1 minute" } },
+    },
+    async (request, reply) => {
+      const parsed = testBodySchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send({ error: "Invalid body" });
+      }
+      const { pair } = parsed.data;
+
+      const [asset] = await db
+        .select()
+        .from(assets)
+        .where(sql`${assets.pair} = ${pair}`)
+        .limit(1);
+
+      if (!asset) {
+        return reply.status(404).send({ error: `Unknown pair: ${pair}` });
+      }
+
+      let currentPrice: number;
+      try {
+        currentPrice = await getTickerPrice(pair);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        logger.warn("Test preview ticker fetch failed", { pair, error: msg });
+        return reply.status(502).send({ error: `Ticker fetch failed: ${msg}` });
+      }
+
+      const testAmountBrl = config.TEST_ORDER_AMOUNT_BRL;
+      const estimatedQty = testAmountBrl / currentPrice;
+      const monthlySpent = await getMonthlySpent(pair);
+      const monthlyCap = parseFloat(asset.monthlyCap);
+      const busyReason = await findBusyReason(pair);
+
+      return {
+        pair,
+        testAmountBrl,
+        currentPrice,
+        estimatedQty,
+        monthlySpent,
+        monthlyCap,
+        busy: busyReason !== null,
+        busyReason,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+  );
+
+  app.post(
+    "/api/test/execute",
+    {
+      ...authPreHandler,
+      config: { rateLimit: { max: 2, timeWindow: "1 minute" } },
+    },
+    async (request, reply) => {
+      const parsed = testBodySchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send({ error: "Invalid body" });
+      }
+      const { pair } = parsed.data;
+
+      const [asset] = await db
+        .select()
+        .from(assets)
+        .where(sql`${assets.pair} = ${pair}`)
+        .limit(1);
+
+      if (!asset) {
+        return reply.status(404).send({ error: `Unknown pair: ${pair}` });
+      }
+
+      const busyReason = await findBusyReason(pair);
+      if (busyReason) {
+        return reply.status(409).send({ error: busyReason });
+      }
+
+      logger.info("Admin triggered test order", {
+        pair,
+        amountBrl: config.TEST_ORDER_AMOUNT_BRL,
+      });
+
+      try {
+        const row = await executeTestOrder(asset, config.TEST_ORDER_AMOUNT_BRL);
+        return {
+          orderId: row.id,
+          bybitOrderId: row.bybitOrderId,
+          status: row.status,
+          pair: row.pair,
+          price: row.price,
+          quantity: row.quantity,
+          fiatSpent: row.fiatSpent,
+          fee: row.fee,
+          feeCurrency: row.feeCurrency,
+          executedAt: row.executedAt.toISOString(),
+        };
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        logger.error("Test order failed", { pair, error: msg });
+        if (error instanceof ExchangeClientError) {
+          return reply.status(400).send({ error: msg });
+        }
+        return reply.status(500).send({ error: msg });
+      }
+    }
+  );
 
   await app.listen({ port: config.PORT, host: "0.0.0.0" });
   logger.info("Fastify server started", { port: config.PORT });

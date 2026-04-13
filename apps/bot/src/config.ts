@@ -7,6 +7,7 @@ const configSchema = z.object({
   TELEGRAM_CHAT_ID: z.string().min(1),
   BUY_AMOUNT_BRL: z.coerce.number().positive(),
   MONTHLY_CAP_BRL: z.coerce.number().positive(),
+  TEST_ORDER_AMOUNT_BRL: z.coerce.number().positive().default(10),
   CRON_SCHEDULE: z.string().min(1).default("0 8 * * 0"),
   LIMIT_DISCOUNT_PCT: z.coerce.number().min(0).max(5).default(0.3),
   LIMIT_WAIT_MINUTES: z.coerce.number().int().min(1).max(1440).default(120),
