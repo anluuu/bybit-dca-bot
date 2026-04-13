@@ -1,5 +1,10 @@
-node_modules
-dist
+**/node_modules
+**/dist
 .env
+.env.test
 .git
+.gitignore
+.dockerignore
 *.md
+**/.DS_Store
+**/.playwright-mcp

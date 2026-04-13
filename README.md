@@ -1,6 +1,6 @@
 # Bybit DCA Bot
 
-Automated Bitcoin Dollar-Cost Averaging bot for Bybit, with a real-time admin dashboard.
+Automated Bitcoin Dollar-Cost Averaging bot for Bybit, with a real-time admin dashboard. Turborepo monorepo: bot service + React dashboard + shared types package.
 
 Buys a fixed BRL amount of BTC every Sunday using a "gentle discount with market fallback" strategy: places a limit order at -0.3% market price, waits 2 hours, falls back to a market order if not filled.
 
@@ -20,6 +20,30 @@ Buys a fixed BRL amount of BTC every Sunday using a "gentle discount with market
 
 ---
 
+## Project Structure
+
+```
+.
+├── apps/
+│   ├── bot/              # Backend service (Fastify + BullMQ + Drizzle)
+│   │   ├── src/
+│   │   ├── drizzle/migrations/
+│   │   └── Dockerfile
+│   └── web/              # React dashboard (Vite + TanStack)
+│       ├── src/
+│       ├── nginx.conf    # Reverse proxy config (prod)
+│       └── Dockerfile
+├── packages/
+│   └── shared/           # API contract types (used by both apps)
+├── docker-compose.yml    # Prod stack (bot + web + postgres + redis)
+├── docker-compose.dev.yml # Local dev databases only
+├── pnpm-workspace.yaml
+├── turbo.json
+└── tsconfig.base.json
+```
+
+---
+
 ## Quick Start (Local Dev)
 
 ### Prerequisites
@@ -28,11 +52,10 @@ Buys a fixed BRL amount of BTC every Sunday using a "gentle discount with market
 - pnpm 10
 - Docker + Docker Compose
 
-### 1. Install dependencies
+### 1. Install all workspace deps
 
 ```bash
 pnpm install
-cd web && pnpm install && cd ..
 ```
 
 ### 2. Start databases
@@ -41,7 +64,7 @@ cd web && pnpm install && cd ..
 pnpm dev:db
 ```
 
-This spins up Postgres + Redis on `localhost:5432` and `localhost:6379`.
+Spins up Postgres + Redis on `localhost:5432` and `localhost:6379`.
 
 ### 3. Configure environment
 
@@ -50,45 +73,45 @@ cp .env.example .env
 # Edit .env with your Bybit, Telegram, and admin credentials
 ```
 
-### 4. Run the bot
+### 4. Run everything
 
 ```bash
 pnpm dev
 ```
 
-The bot will:
-- Run migrations
-- Seed the BTCBRL asset
-- Register the cron job
-- Start the Fastify API on port 3000
+Turbo runs both apps in parallel:
+- Bot on `http://localhost:3000` (Fastify API)
+- Dashboard on `http://localhost:5173` (Vite dev server, proxies API to bot)
 
-### 5. Run the dashboard
+Open <http://localhost:5173>.
+
+### Run individual apps
 
 ```bash
-cd web && pnpm dev
+pnpm --filter @dca/bot dev   # bot only
+pnpm --filter @dca/web dev   # dashboard only
 ```
-
-Open <http://localhost:5173>. The Vite dev server proxies API calls to the bot on port 3000.
 
 ---
 
 ## Production Deployment
 
-This project is built for [Dokploy](https://dokploy.com/) on a VPS.
+Deploy on [Dokploy](https://dokploy.com/) or any Docker Compose host:
 
 ```bash
 docker compose --env-file .env up -d
 ```
 
-This starts 3 containers:
+This starts 4 containers:
 
 | Service | Image | Purpose |
 |---------|-------|---------|
-| `bot` | Built from Dockerfile | Bot + Fastify API + dashboard backend |
+| `bot` | `apps/bot/Dockerfile` | DCA service + Fastify API (internal) |
+| `web` | `apps/web/Dockerfile` | nginx serving the dashboard + proxying API to bot |
 | `postgres` | `postgres:16-alpine` | Purchase history, asset config |
 | `redis` | `redis:7-alpine` | BullMQ job queue |
 
-All three have health checks, restart policies, and named volumes for persistence.
+Only the `web` container exposes a public port (default `8080`). The bot is reachable only inside the Docker network.
 
 ---
 
@@ -120,14 +143,15 @@ All configuration is via environment variables. See `.env.example` for the full 
 | `LIMIT_WAIT_MINUTES` | `120` | How long to wait for limit fill |
 | `TRADING_PAIR` | `BTCBRL` | Bybit spot pair |
 | `REDIS_URL` | `redis://localhost:6379` | Redis connection |
-| `PORT` | `3000` | Fastify port |
+| `PORT` | `3000` | Fastify port (internal) |
+| `WEB_PORT` | `8080` | Public port for the dashboard |
 | `ADMIN_USERNAME` | `admin` | Dashboard login username |
 
 ---
 
 ## Dashboard
 
-Two views:
+Two views (same URL):
 
 - **Public** (`/`): bot status, monthly spending progress, accumulation chart. No order details.
 - **Admin** (`/#login`): full purchase history with pagination, all charts and stats.
@@ -140,9 +164,9 @@ Login uses JWT in an httpOnly cookie. Rate-limited to 5 attempts/minute.
 
 | Layer | Choice |
 |-------|--------|
+| Monorepo | Turborepo + pnpm workspaces |
 | Language | TypeScript |
 | Runtime | Node 22 |
-| Package manager | pnpm |
 | HTTP framework | Fastify |
 | Job queue | BullMQ (Redis) |
 | HTTP client | Axios |
@@ -151,6 +175,7 @@ Login uses JWT in an httpOnly cookie. Rate-limited to 5 attempts/minute.
 | Telegram | Telegraf |
 | Auth | @fastify/jwt + bcryptjs |
 | Frontend | React 19, TanStack Query, Tailwind CSS v4, Recharts |
+| Static serving | nginx (in `web` container) |
 | Container | Docker (multi-stage Alpine) |
 
 ---
@@ -164,41 +189,25 @@ Login uses JWT in an httpOnly cookie. Rate-limited to 5 attempts/minute.
 
 ---
 
-## Project Structure
-
-```
-.
-├── src/                  # Bot backend
-│   ├── config.ts         # Env var validation (Zod)
-│   ├── logger.ts         # JSON structured logger
-│   ├── exchange.ts       # Bybit V5 API client (axios)
-│   ├── strategy.ts       # DCA execution logic
-│   ├── spending.ts       # Monthly cap tracker
-│   ├── notifications.ts  # Telegram (Telegraf)
-│   ├── queue.ts          # BullMQ worker + repeatable jobs
-│   ├── server.ts         # Fastify HTTP server (auth, health, API)
-│   ├── index.ts          # Entry point
-│   └── db/               # Drizzle schema + client + migrations
-├── web/                  # React dashboard (Vite + TanStack)
-├── drizzle/migrations/   # Generated SQL migrations
-├── Dockerfile            # Multi-stage production build
-├── docker-compose.yml    # Production stack (bot + postgres + redis)
-└── docker-compose.dev.yml # Local dev (postgres + redis only)
-```
-
----
-
-## Scripts
+## Scripts (root)
 
 | Command | What it does |
 |---------|--------------|
-| `pnpm dev` | Run bot in dev mode (tsx watch) |
-| `pnpm build` | Compile TypeScript to `dist/` |
-| `pnpm start` | Run compiled bot |
-| `pnpm db:generate` | Generate Drizzle migration from schema changes |
-| `pnpm db:migrate` | Run pending migrations |
+| `pnpm dev` | Run all apps in dev mode (turbo) |
+| `pnpm build` | Build all apps (turbo, with caching) |
+| `pnpm typecheck` | Type-check all apps |
 | `pnpm dev:db` | Start dev databases (postgres + redis) |
 | `pnpm dev:db:down` | Stop dev databases |
+| `pnpm db:generate` | Generate Drizzle migration from schema changes |
+| `pnpm db:migrate` | Run pending migrations |
+
+### Per-app scripts
+
+```bash
+pnpm --filter @dca/bot <script>     # e.g. dev, build, db:generate
+pnpm --filter @dca/web <script>     # e.g. dev, build, preview
+pnpm --filter @dca/shared build
+```
 
 ---
 
@@ -212,6 +221,7 @@ Login uses JWT in an httpOnly cookie. Rate-limited to 5 attempts/minute.
 - Login endpoint rate-limited to 5/minute (brute-force protection)
 - Bcrypt password hashing (12 rounds)
 - All admin API endpoints require authentication
+- Bot is not exposed publicly — only nginx (web container) is
 
 ---
 

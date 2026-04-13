@@ -1,4 +1,13 @@
-const API_BASE = "/api";
+// Shared API contract types — used by both bot (server) and web (client).
+// These describe the JSON wire format, not the database row shape.
+
+export type OrderType = "limit" | "market";
+export type OrderStatus =
+  | "pending"
+  | "filled"
+  | "cancelled"
+  | "failed"
+  | "skipped_cap";
 
 export interface Order {
   id: number;
@@ -26,13 +35,8 @@ export interface Asset {
   limitDiscount: string;
   limitWaitMins: number;
   enabled: boolean;
-}
-
-export interface HealthStatus {
-  status: string;
-  uptime: number;
-  postgres?: string;
-  redis?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface OrdersPage {
@@ -41,12 +45,6 @@ export interface OrdersPage {
   pageSize: number;
   total: number;
   totalPages: number;
-}
-
-export interface ChartPoint {
-  date: string;
-  btc: number;
-  spent: number;
 }
 
 export interface OrdersSummary {
@@ -58,16 +56,20 @@ export interface OrdersSummary {
   avgPrice: number;
 }
 
-async function fetchJson<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`);
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
-  return res.json();
+export interface ChartPoint {
+  date: string;
+  btc: number;
+  spent: number;
 }
 
-export const api = {
-  getOrders: () => fetchJson<Order[]>("/orders"),
-  getAssets: () => fetchJson<Asset[]>("/assets"),
-  getSummary: () => fetchJson<OrdersSummary>("/orders/summary"),
-  getHealth: () =>
-    fetch("/health/ready").then((r) => r.json() as Promise<HealthStatus>),
-};
+export interface HealthStatus {
+  status: string;
+  uptime: number;
+  postgres?: string;
+  redis?: string;
+}
+
+export interface AuthUser {
+  username: string;
+  role: string;
+}

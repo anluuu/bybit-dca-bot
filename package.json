@@ -1,48 +1,27 @@
 {
   "name": "bybit-dca-bot",
   "version": "1.0.0",
-  "description": "Automated DCA bot for Bybit exchange",
-  "type": "module",
-  "scripts": {
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "dev": "tsx src/index.ts",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx src/db/migrate.ts",
-    "dev:db": "docker compose -f docker-compose.dev.yml up -d",
-    "dev:db:down": "docker compose -f docker-compose.dev.yml down"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "description": "Automated DCA bot for Bybit exchange (monorepo)",
+  "private": true,
   "packageManager": "pnpm@10.30.2",
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "typecheck": "turbo typecheck",
+    "lint": "turbo lint",
+    "dev:db": "docker compose -f docker-compose.dev.yml up -d",
+    "dev:db:down": "docker compose -f docker-compose.dev.yml down",
+    "db:generate": "pnpm --filter @dca/bot db:generate",
+    "db:migrate": "pnpm --filter @dca/bot db:migrate"
+  },
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild",
       "msgpackr-extract"
     ]
   },
-  "dependencies": {
-    "@fastify/cookie": "^11.0.2",
-    "@fastify/cors": "^11.2.0",
-    "@fastify/csrf-protection": "^7.1.0",
-    "@fastify/jwt": "^10.0.0",
-    "@fastify/rate-limit": "^10.3.0",
-    "axios": "^1.15.0",
-    "bcryptjs": "^3.0.3",
-    "bullmq": "^5.73.5",
-    "drizzle-orm": "^0.45.2",
-    "fastify": "^5.8.4",
-    "ioredis": "^5.10.1",
-    "postgres": "^3.4.9",
-    "telegraf": "^4.16.3",
-    "zod": "^4.3.6"
-  },
   "devDependencies": {
-    "@types/bcryptjs": "^3.0.0",
-    "@types/node": "^25.6.0",
-    "drizzle-kit": "^0.31.10",
-    "tsx": "^4.21.0",
+    "turbo": "^2.3.0",
     "typescript": "^6.0.2"
   }
 }
