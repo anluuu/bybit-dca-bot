@@ -6,6 +6,7 @@ import { assets } from "./db/schema.js";
 import { createRedisConnection, setupQueue, registerJobs } from "./queue.js";
 import { startServer } from "./server.js";
 import { initBot } from "./notifications.js";
+import { initSignalsCache } from "./signals/cache.js";
 import { logger } from "./logger.js";
 
 async function seedAssets() {
@@ -42,8 +43,10 @@ async function main() {
   // 3. Initialize Telegram bot
   initBot();
 
-  // 4. Initialize Redis + BullMQ
+  // 4. Initialize Redis + BullMQ. The same Redis connection backs the signal
+  // cache (signals/cache.ts) — no need to open a second connection.
   const redisConnection = createRedisConnection();
+  initSignalsCache(redisConnection);
   const { queue, worker } = await setupQueue(redisConnection);
 
   // 5. Register repeatable jobs

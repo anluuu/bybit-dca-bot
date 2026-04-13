@@ -16,4 +16,7 @@ export type {
   PublicOrder,
   PublicOrdersPage,
   PublicStatus,
+  PublicSignals,
+  AdminSignals,
+  SignalFallback,
 } from "@dca/shared";

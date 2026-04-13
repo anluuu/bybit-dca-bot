@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Bitcoin, LogIn, LogOut, Eye, AlertTriangle } from "lucide-react";
 import { StatusCard } from "./components/StatusCard.tsx";
 import { SpendingCard } from "./components/SpendingCard.tsx";
+import { SignalsPanel } from "./components/SignalsPanel.tsx";
 import { AccumulationChart } from "./components/AccumulationChart.tsx";
 import { MonthlyOverview } from "./components/MonthlyOverview.tsx";
 import { OrdersTable } from "./components/OrdersTable.tsx";
@@ -21,6 +22,8 @@ import type {
   PublicMonthlyBreakdown,
   PublicOrdersPage,
   PublicStatus,
+  PublicSignals,
+  AdminSignals,
 } from "./lib/api.ts";
 
 const queryClient = new QueryClient({
@@ -76,6 +79,17 @@ function useMonthly() {
     queryFn: async () => {
       const res = await fetch("/api/orders/monthly", { credentials: "include" });
       if (!res.ok) throw new Error(`Failed to load monthly (${res.status})`);
+      return res.json();
+    },
+  });
+}
+
+function useAdminSignals() {
+  return useQuery<AdminSignals>({
+    queryKey: ["admin-signals"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/signals", { credentials: "include" });
+      if (!res.ok) throw new Error(`Failed to load signals (${res.status})`);
       return res.json();
     },
   });
@@ -140,6 +154,17 @@ function usePublicStatus() {
   });
 }
 
+function usePublicSignals() {
+  return useQuery<PublicSignals>({
+    queryKey: ["public-signals"],
+    queryFn: async () => {
+      const res = await fetch("/api/public/signals");
+      if (!res.ok) throw new Error();
+      return res.json();
+    },
+  });
+}
+
 function useHealth() {
   return useQuery<HealthStatus>({
     queryKey: ["health"],
@@ -196,6 +221,10 @@ function AdminDashboard() {
   const { data: summary, error: summaryError } = useSummary();
   const { data: monthly, error: monthlyError } = useMonthly();
   const { data: health } = useHealth();
+  // Signals are non-critical — if they fail, the dashboard still renders the
+  // rest of the cards. No point gating the whole view on an upstream market-
+  // data fetch.
+  const { data: signals } = useAdminSignals();
 
   const apiError = ordersError || assetsError || summaryError || monthlyError;
 
@@ -241,6 +270,10 @@ function AdminDashboard() {
         </div>
       )}
 
+      <div className="mb-6">
+        <SignalsPanel variant="admin" data={signals} />
+      </div>
+
       {ordersPage && (
         <>
           <div className="mb-6">
@@ -258,6 +291,7 @@ function AdminDashboard() {
               totalPages={ordersPage.totalPages}
               total={ordersPage.total}
               onPageChange={setPage}
+              variant="admin"
             />
           </div>
         </>
@@ -282,6 +316,7 @@ function PublicDashboard() {
   const { data: monthly } = usePublicMonthly();
   const { data: ordersPage } = usePublicOrders(page);
   const { data: status } = usePublicStatus();
+  const { data: signals } = usePublicSignals();
   const { data: health } = useHealth();
 
   return (
@@ -328,6 +363,10 @@ function PublicDashboard() {
           <SpendingCard summary={summary} />
         </div>
       )}
+
+      <div className="mb-6">
+        <SignalsPanel variant="public" data={signals} />
+      </div>
 
       {chartPoints && (
         <div className="mb-6">

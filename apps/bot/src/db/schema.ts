@@ -48,6 +48,15 @@ export const orders = pgTable(
     feeCurrency: varchar("fee_currency", { length: 10 }),
     errorMessage: text("error_message"),
     isTest: boolean("is_test").notNull().default(false),
+    // Signal snapshot at order placement time. All nullable so historical
+    // rows and orders placed with signal fetch failures still persist.
+    // See signals/compose.ts for how these are computed.
+    mayerMultiple: numeric("mayer_multiple", { precision: 8, scale: 4 }),
+    ma200wDistancePct: numeric("ma_200w_distance_pct", { precision: 8, scale: 4 }),
+    fearGreedIndex: integer("fear_greed_index"),
+    compositeScore: numeric("composite_score", { precision: 5, scale: 4 }),
+    appliedMultiplier: numeric("applied_multiplier", { precision: 4, scale: 2 }),
+    signalFallback: varchar("signal_fallback", { length: 32 }),
     executedAt: timestamp("executed_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
