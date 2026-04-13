@@ -171,18 +171,12 @@ function AdminDashboard() {
         </div>
       )}
 
-      {assets?.[0] && (
-        <div className="mb-6">
-          <TestOrderCard pair={assets[0].pair} />
-        </div>
-      )}
-
       {ordersPage && (
         <>
           <div className="mb-6">
             <AccumulationChart orders={ordersPage.data} />
           </div>
-          <div>
+          <div className="mb-6">
             <OrdersTable
               orders={ordersPage.data}
               page={ordersPage.page}
@@ -192,6 +186,12 @@ function AdminDashboard() {
             />
           </div>
         </>
+      )}
+
+      {assets?.[0] && (
+        <div>
+          <TestOrderCard pair={assets[0].pair} />
+        </div>
       )}
     </div>
   );
