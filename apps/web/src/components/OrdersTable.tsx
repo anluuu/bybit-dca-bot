@@ -163,7 +163,9 @@ export function OrdersTable({
                 </td>
                 <td className="px-3 py-3 font-mono text-xs tabular-nums text-surface-400">
                   {order.fee
-                    ? `${parseFloat(order.fee).toFixed(8)} ${order.feeCurrency}`
+                    ? order.feeCurrency
+                      ? `${parseFloat(order.fee).toFixed(8)} ${order.feeCurrency}`
+                      : parseFloat(order.fee).toFixed(8)
                     : "—"}
                 </td>
                 <td className="px-3 py-3">{statusBadge(order.status)}</td>
