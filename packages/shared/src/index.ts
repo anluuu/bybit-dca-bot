@@ -99,6 +99,41 @@ export interface ChartPoint {
   spent: number;
 }
 
+/**
+ * Per-calendar-month aggregation of filled, non-test orders.
+ * `avgPrice` is volume-weighted (ΣBRL / ΣBTC), which is the meaningful
+ * cost-basis for DCA — not the arithmetic mean of per-order prices.
+ * `vsPrevPct` compares avgPrice to the previous (chronologically earlier)
+ * month; negative values mean we bought cheaper this month.
+ */
+export interface MonthlyBreakdown {
+  /** ISO yyyy-MM, stable for sort (e.g. "2026-03"). */
+  month: string;
+  /** Human label pre-formatted server-side (e.g. "Mar 2026"). */
+  label: string;
+  orderCount: number;
+  totalBtc: number;
+  totalSpent: number;
+  avgPrice: number;
+  minPrice: number;
+  maxPrice: number;
+  /** null for the earliest month we have data for. */
+  vsPrevPct: number | null;
+}
+
+/**
+ * Public-safe variant — no order counts, min/max price ranges, or
+ * operational detail. Avg is still volume-weighted.
+ */
+export interface PublicMonthlyBreakdown {
+  month: string;
+  label: string;
+  totalBtc: number;
+  totalSpent: number;
+  avgPrice: number;
+  vsPrevPct: number | null;
+}
+
 export interface HealthStatus {
   status: string;
   uptime: number;

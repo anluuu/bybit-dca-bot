@@ -11,4 +11,6 @@ export type {
   AuthUser,
   TestOrderPreview,
   TestOrderResult,
+  MonthlyBreakdown,
+  PublicMonthlyBreakdown,
 } from "@dca/shared";

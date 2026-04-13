@@ -208,6 +208,83 @@ export async function startServer(redisConnection: Redis) {
     };
   });
 
+  /**
+   * Per-calendar-month aggregation (UTC). Returns rows newest-first with
+   * volume-weighted avg price and a delta vs. the chronologically previous
+   * month. Shared by the admin and public monthly endpoints.
+   */
+  async function getMonthlyBreakdown() {
+    const rows = await db.execute<{
+      month: string;
+      order_count: string;
+      total_btc: string;
+      total_spent: string;
+      avg_price: string | null;
+      min_price: string | null;
+      max_price: string | null;
+    }>(sql`
+      SELECT
+        to_char(${orders.executedAt} AT TIME ZONE 'UTC', 'YYYY-MM') AS month,
+        COUNT(*)::text AS order_count,
+        COALESCE(SUM(${orders.quantity}), 0)::text AS total_btc,
+        COALESCE(SUM(${orders.fiatSpent}), 0)::text AS total_spent,
+        (SUM(${orders.fiatSpent}) / NULLIF(SUM(${orders.quantity}), 0))::text AS avg_price,
+        MIN(${orders.price})::text AS min_price,
+        MAX(${orders.price})::text AS max_price
+      FROM ${orders}
+      WHERE ${orders.status} = 'filled'
+        AND ${orders.isTest} = false
+        AND ${orders.quantity} IS NOT NULL
+        AND ${orders.fiatSpent} IS NOT NULL
+      GROUP BY 1
+      ORDER BY 1 DESC
+    `);
+
+    const monthLabelFmt = new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+
+    // rows are newest-first; to compute vsPrevPct we need each month's
+    // predecessor (chronologically earlier), which in a newest-first array
+    // is the *next* index.
+    return rows.map((r, i) => {
+      const [y, m] = r.month.split("-").map(Number);
+      const label = monthLabelFmt.format(new Date(Date.UTC(y, m - 1, 1)));
+      const avgPrice = parseFloat(r.avg_price ?? "0");
+      const prev = rows[i + 1];
+      const prevAvg = prev ? parseFloat(prev.avg_price ?? "0") : 0;
+      const vsPrevPct =
+        prev && prevAvg > 0 ? ((avgPrice - prevAvg) / prevAvg) * 100 : null;
+
+      return {
+        month: r.month,
+        label,
+        orderCount: parseInt(r.order_count, 10),
+        totalBtc: parseFloat(r.total_btc),
+        totalSpent: parseFloat(r.total_spent),
+        avgPrice,
+        minPrice: parseFloat(r.min_price ?? "0"),
+        maxPrice: parseFloat(r.max_price ?? "0"),
+        vsPrevPct,
+      };
+    });
+  }
+
+  app.get("/api/public/monthly", async () => {
+    const rows = await getMonthlyBreakdown();
+    // Strip operational detail for the public view.
+    return rows.map((r) => ({
+      month: r.month,
+      label: r.label,
+      totalBtc: r.totalBtc,
+      totalSpent: r.totalSpent,
+      avgPrice: r.avgPrice,
+      vsPrevPct: r.vsPrevPct,
+    }));
+  });
+
   app.get("/api/public/chart", async () => {
     const filled = await db
       .select({
@@ -310,6 +387,10 @@ export async function startServer(redisConnection: Redis) {
       monthlySpent: parseFloat(monthly[0].monthlySpent),
       monthlyCap: firstAsset[0] ? parseFloat(firstAsset[0].monthlyCap) : 1000,
     };
+  });
+
+  app.get("/api/orders/monthly", authPreHandler, async () => {
+    return getMonthlyBreakdown();
   });
 
   app.get("/api/assets", authPreHandler, async () => {

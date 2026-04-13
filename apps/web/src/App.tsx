@@ -4,6 +4,7 @@ import { Bitcoin, LogIn, LogOut, Eye, AlertTriangle } from "lucide-react";
 import { StatusCard } from "./components/StatusCard.tsx";
 import { SpendingCard } from "./components/SpendingCard.tsx";
 import { AccumulationChart } from "./components/AccumulationChart.tsx";
+import { MonthlyOverview } from "./components/MonthlyOverview.tsx";
 import { OrdersTable } from "./components/OrdersTable.tsx";
 import { TestOrderCard } from "./components/TestOrderCard.tsx";
 import { LoginPage } from "./components/LoginPage.tsx";
@@ -15,6 +16,8 @@ import type {
   OrdersSummary,
   HealthStatus,
   ChartPoint,
+  MonthlyBreakdown,
+  PublicMonthlyBreakdown,
 } from "./lib/api.ts";
 
 const queryClient = new QueryClient({
@@ -64,6 +67,17 @@ function useSummary() {
   });
 }
 
+function useMonthly() {
+  return useQuery<MonthlyBreakdown[]>({
+    queryKey: ["monthly"],
+    queryFn: async () => {
+      const res = await fetch("/api/orders/monthly", { credentials: "include" });
+      if (!res.ok) throw new Error(`Failed to load monthly (${res.status})`);
+      return res.json();
+    },
+  });
+}
+
 // --- Hooks for public data ---
 
 function usePublicSummary() {
@@ -82,6 +96,17 @@ function usePublicChart() {
     queryKey: ["public-chart"],
     queryFn: async () => {
       const res = await fetch("/api/public/chart");
+      if (!res.ok) throw new Error();
+      return res.json();
+    },
+  });
+}
+
+function usePublicMonthly() {
+  return useQuery<PublicMonthlyBreakdown[]>({
+    queryKey: ["public-monthly"],
+    queryFn: async () => {
+      const res = await fetch("/api/public/monthly");
       if (!res.ok) throw new Error();
       return res.json();
     },
@@ -124,9 +149,10 @@ function AdminDashboard() {
   const { data: ordersPage, error: ordersError } = useOrders(page);
   const { data: assets, error: assetsError } = useAssets();
   const { data: summary, error: summaryError } = useSummary();
+  const { data: monthly, error: monthlyError } = useMonthly();
   const { data: health } = useHealth();
 
-  const apiError = ordersError || assetsError || summaryError;
+  const apiError = ordersError || assetsError || summaryError || monthlyError;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
@@ -176,6 +202,11 @@ function AdminDashboard() {
           <div className="mb-6">
             <AccumulationChart orders={ordersPage.data} />
           </div>
+          {monthly && (
+            <div className="mb-6">
+              <MonthlyOverview data={monthly} variant="admin" />
+            </div>
+          )}
           <div className="mb-6">
             <OrdersTable
               orders={ordersPage.data}
@@ -202,6 +233,7 @@ function AdminDashboard() {
 function PublicDashboard() {
   const { data: summary } = usePublicSummary();
   const { data: chartPoints } = usePublicChart();
+  const { data: monthly } = usePublicMonthly();
   const { data: health } = useHealth();
 
   return (
@@ -267,6 +299,12 @@ function PublicDashboard() {
       {chartPoints && chartPoints.length > 0 && (
         <div className="mb-6">
           <AccumulationChart points={chartPoints} />
+        </div>
+      )}
+
+      {monthly && monthly.length > 0 && (
+        <div className="mb-6">
+          <MonthlyOverview data={monthly} variant="public" />
         </div>
       )}
 
