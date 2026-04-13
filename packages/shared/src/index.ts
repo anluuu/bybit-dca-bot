@@ -122,16 +122,42 @@ export interface MonthlyBreakdown {
 }
 
 /**
- * Public-safe variant — no order counts, min/max price ranges, or
- * operational detail. Avg is still volume-weighted.
+ * Public-safe variant. Historically stripped orderCount / min / max — now
+ * identical to MonthlyBreakdown because those fields aren't escalatable
+ * (they're derivable from the public chart anyway). Kept as an alias so
+ * existing imports don't break.
  */
-export interface PublicMonthlyBreakdown {
-  month: string;
-  label: string;
-  totalBtc: number;
-  totalSpent: number;
-  avgPrice: number;
-  vsPrevPct: number | null;
+export type PublicMonthlyBreakdown = MonthlyBreakdown;
+
+/**
+ * Public-safe Order projection: strips DB primary keys, the vendor-side
+ * Bybit order identifier, raw error messages (may contain stack traces or
+ * API-key fragments), the is_test flag (public orders are always is_test=false),
+ * and created_at (only executedAt is interesting to a viewer).
+ */
+export type PublicOrder = Omit<
+  Order,
+  "id" | "assetId" | "bybitOrderId" | "errorMessage" | "isTest" | "createdAt"
+>;
+
+export interface PublicOrdersPage {
+  data: PublicOrder[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+/**
+ * Public-safe subset of the first configured asset: just the fields the
+ * public StatusCard needs (pair, weekly buy amount, cron schedule, monthly
+ * cap). Omits strategy-tuning fields like limitDiscount / limitWaitMins.
+ */
+export interface PublicStatus {
+  pair: string;
+  buyAmount: string;
+  cronSchedule: string;
+  monthlyCap: string;
 }
 
 export interface HealthStatus {

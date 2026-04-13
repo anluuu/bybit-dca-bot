@@ -18,6 +18,8 @@ import type {
   ChartPoint,
   MonthlyBreakdown,
   PublicMonthlyBreakdown,
+  PublicOrdersPage,
+  PublicStatus,
 } from "./lib/api.ts";
 
 const queryClient = new QueryClient({
@@ -107,6 +109,30 @@ function usePublicMonthly() {
     queryKey: ["public-monthly"],
     queryFn: async () => {
       const res = await fetch("/api/public/monthly");
+      if (!res.ok) throw new Error();
+      return res.json();
+    },
+  });
+}
+
+function usePublicOrders(page: number, pageSize: number = 25) {
+  return useQuery<PublicOrdersPage>({
+    queryKey: ["public-orders", page, pageSize],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/public/orders?page=${page}&pageSize=${pageSize}`
+      );
+      if (!res.ok) throw new Error();
+      return res.json();
+    },
+  });
+}
+
+function usePublicStatus() {
+  return useQuery<PublicStatus>({
+    queryKey: ["public-status"],
+    queryFn: async () => {
+      const res = await fetch("/api/public/status");
       if (!res.ok) throw new Error();
       return res.json();
     },
@@ -231,9 +257,12 @@ function AdminDashboard() {
 // --- Public Dashboard (read-only, limited data) ---
 
 function PublicDashboard() {
+  const [page, setPage] = useState(1);
   const { data: summary } = usePublicSummary();
   const { data: chartPoints } = usePublicChart();
   const { data: monthly } = usePublicMonthly();
+  const { data: ordersPage } = usePublicOrders(page);
+  const { data: status } = usePublicStatus();
   const { data: health } = useHealth();
 
   return (
@@ -251,6 +280,12 @@ function PublicDashboard() {
           </p>
         </div>
         <div className="ml-auto flex items-center gap-3">
+          <div className="hidden sm:flex items-center gap-2 rounded-lg border border-surface-700/30 bg-surface-800/40 px-3 py-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-green-gain" />
+            <span className="font-mono text-xs text-surface-300">
+              {status?.pair ?? "BTCBRL"}
+            </span>
+          </div>
           <div className="flex items-center gap-1.5 rounded-lg border border-surface-700/30 bg-surface-800/40 px-3 py-1.5">
             <Eye className="h-3.5 w-3.5 text-surface-400" />
             <span className="text-xs text-surface-400">Public view</span>
@@ -269,33 +304,13 @@ function PublicDashboard() {
         </div>
       </header>
 
-      <div className="mb-6 grid gap-6 md:grid-cols-2">
-        <div className="rounded-xl border border-surface-700/50 bg-surface-900/80 p-5 backdrop-blur-sm">
-          <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase text-surface-300">
-            Bot Status
-          </h2>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="relative flex h-3 w-3">
-              {health?.status === "ok" && (
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-gain opacity-40" />
-              )}
-              <span
-                className={`relative inline-flex h-3 w-3 rounded-full ${health?.status === "ok" ? "bg-green-gain" : "bg-red-loss"}`}
-              />
-            </div>
-            <span className="font-mono text-sm font-medium text-surface-100">
-              {health?.status === "ok" ? "Running" : health ? "Degraded" : "Unknown"}
-            </span>
-          </div>
-          <p className="text-xs text-surface-500">
-            Sign in to view full service details
-          </p>
+      {summary && health && (
+        <div className="mb-6 grid gap-6 md:grid-cols-2">
+          <StatusCard health={health} asset={status} />
+          <SpendingCard summary={summary} />
         </div>
+      )}
 
-        {summary && <SpendingCard summary={summary} />}
-      </div>
-
-      {/* Public accumulation chart */}
       {chartPoints && chartPoints.length > 0 && (
         <div className="mb-6">
           <AccumulationChart points={chartPoints} />
@@ -304,21 +319,21 @@ function PublicDashboard() {
 
       {monthly && monthly.length > 0 && (
         <div className="mb-6">
-          <MonthlyOverview data={monthly} variant="public" />
+          <MonthlyOverview data={monthly} variant="admin" />
         </div>
       )}
 
-      <div className="mb-6 rounded-xl border border-surface-700/30 bg-surface-900/50 p-8 text-center">
-        <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-surface-700/30 bg-surface-800/50">
-          <LogIn className="h-5 w-5 text-surface-400" />
+      {ordersPage && ordersPage.data.length > 0 && (
+        <div className="mb-6">
+          <OrdersTable
+            orders={ordersPage.data}
+            page={ordersPage.page}
+            totalPages={ordersPage.totalPages}
+            total={ordersPage.total}
+            onPageChange={setPage}
+          />
         </div>
-        <p className="text-sm font-medium text-surface-300">
-          Sign in to view purchase history
-        </p>
-        <p className="mt-1 text-xs text-surface-500">
-          Detailed order data is admin-only
-        </p>
-      </div>
+      )}
     </div>
   );
 }

@@ -1,9 +1,28 @@
 import { ArrowUpDown, ChevronLeft, ChevronRight, ListOrdered } from "lucide-react";
 import { useState } from "react";
-import type { Order } from "../lib/api.ts";
+import type { Order, PublicOrder } from "../lib/api.ts";
+
+/**
+ * Display shape shared by admin `Order` and sanitized `PublicOrder`.
+ * Fields missing in PublicOrder (`id`, `isTest`) are optional here so both
+ * types are assignable.
+ */
+type OrderRow = {
+  id?: number;
+  executedAt: string;
+  pair: string;
+  orderType: string;
+  status: string;
+  price: string | null;
+  quantity: string | null;
+  fiatSpent: string | null;
+  fee: string | null;
+  feeCurrency: string | null;
+  isTest?: boolean;
+};
 
 interface OrdersTableProps {
-  orders: Order[];
+  orders: ReadonlyArray<Order | PublicOrder>;
   page?: number;
   totalPages?: number;
   total?: number;
@@ -51,7 +70,9 @@ export function OrdersTable({
   const [sortKey, setSortKey] = useState<SortKey>("executedAt");
   const [sortAsc, setSortAsc] = useState(false);
 
-  const sorted = [...orders].sort((a, b) => {
+  const rows: OrderRow[] = orders as unknown as OrderRow[];
+
+  const sorted = [...rows].sort((a, b) => {
     let cmp = 0;
     if (sortKey === "executedAt") {
       cmp =
@@ -81,7 +102,7 @@ export function OrdersTable({
           Purchase History
         </h2>
         <span className="ml-auto font-mono text-xs text-surface-400">
-          {total !== undefined ? `${total} orders` : `${orders.length} orders`}
+          {total !== undefined ? `${total} orders` : `${rows.length} orders`}
         </span>
       </div>
 
@@ -121,9 +142,9 @@ export function OrdersTable({
             </tr>
           </thead>
           <tbody>
-            {sorted.map((order) => (
+            {sorted.map((order, idx) => (
               <tr
-                key={order.id}
+                key={order.id ?? `${order.executedAt}-${order.pair}-${idx}`}
                 className="border-b border-surface-700/10 transition-colors hover:bg-surface-800/40"
               >
                 <td className="px-5 py-3 font-mono text-xs text-surface-200">

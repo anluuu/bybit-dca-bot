@@ -163,7 +163,19 @@ export async function startServer(redisConnection: Redis) {
     });
   });
 
-  // --- Public API (read-only, limited data) ---
+  // --- Public API (read-only, sanitized data) ---
+  //
+  // Public endpoints expose the full purchase history, monthly breakdown,
+  // next-scheduled-buy info, and cumulative chart — but strip anything
+  // escalatable: bybitOrderId (vendor-side identifier), errorMessage (can
+  // leak stack/key fragments), DB primary keys, and strategy-tuning asset
+  // fields (limitDiscount, limitWaitMins). Test-order execution stays
+  // admin-only.
+
+  const ordersQuerySchema = z.object({
+    page: z.coerce.number().int().min(1).default(1),
+    pageSize: z.coerce.number().int().min(1).max(100).default(25),
+  });
 
   app.get("/api/public/summary", async () => {
     const now = new Date();
@@ -273,17 +285,74 @@ export async function startServer(redisConnection: Redis) {
   }
 
   app.get("/api/public/monthly", async () => {
-    const rows = await getMonthlyBreakdown();
-    // Strip operational detail for the public view.
-    return rows.map((r) => ({
-      month: r.month,
-      label: r.label,
-      totalBtc: r.totalBtc,
-      totalSpent: r.totalSpent,
-      avgPrice: r.avgPrice,
-      vsPrevPct: r.vsPrevPct,
-    }));
+    // Full breakdown is safe to expose publicly — orderCount / min / max
+    // are derivable from the public chart and aren't escalatable.
+    return getMonthlyBreakdown();
   });
+
+  app.get("/api/public/status", async (_req, reply) => {
+    const [firstAsset] = await db.select().from(assets).limit(1);
+    if (!firstAsset) {
+      return reply.status(404).send({ error: "No asset configured" });
+    }
+    return {
+      pair: firstAsset.pair,
+      buyAmount: firstAsset.buyAmount,
+      cronSchedule: firstAsset.cronSchedule,
+      monthlyCap: firstAsset.monthlyCap,
+    };
+  });
+
+  app.get(
+    "/api/public/orders",
+    { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } },
+    async (request, reply) => {
+      const parsed = ordersQuerySchema.safeParse(request.query);
+      if (!parsed.success) {
+        return reply.status(400).send({ error: "Invalid query params" });
+      }
+      const { page, pageSize } = parsed.data;
+
+      // Select explicit columns only — never leak bybitOrderId, errorMessage,
+      // or DB primary keys. Include all statuses (filled/failed/skipped_cap)
+      // so skipped weeks are visible; test orders are always excluded.
+      const [rows, count] = await Promise.all([
+        db
+          .select({
+            pair: orders.pair,
+            orderType: orders.orderType,
+            status: orders.status,
+            price: orders.price,
+            quantity: orders.quantity,
+            fiatSpent: orders.fiatSpent,
+            fee: orders.fee,
+            feeCurrency: orders.feeCurrency,
+            executedAt: orders.executedAt,
+          })
+          .from(orders)
+          .where(sql`${orders.isTest} = false`)
+          .orderBy(desc(orders.executedAt))
+          .limit(pageSize)
+          .offset((page - 1) * pageSize),
+        db
+          .select({ total: sql<string>`COUNT(*)` })
+          .from(orders)
+          .where(sql`${orders.isTest} = false`),
+      ]);
+
+      const total = parseInt(count[0].total);
+      return {
+        data: rows.map((r) => ({
+          ...r,
+          executedAt: r.executedAt.toISOString(),
+        })),
+        page,
+        pageSize,
+        total,
+        totalPages: Math.ceil(total / pageSize),
+      };
+    }
+  );
 
   app.get("/api/public/chart", async () => {
     const filled = await db
@@ -311,11 +380,6 @@ export async function startServer(redisConnection: Redis) {
   });
 
   // --- Private API (auth required) ---
-
-  const ordersQuerySchema = z.object({
-    page: z.coerce.number().int().min(1).default(1),
-    pageSize: z.coerce.number().int().min(1).max(100).default(25),
-  });
 
   app.get("/api/orders", authPreHandler, async (request, reply) => {
     const parsed = ordersQuerySchema.safeParse(request.query);

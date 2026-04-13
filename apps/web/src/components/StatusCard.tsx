@@ -6,7 +6,7 @@ import {
   Database,
   Server,
 } from "lucide-react";
-import type { HealthStatus, Asset } from "../lib/api.ts";
+import type { HealthStatus, Asset, PublicStatus } from "../lib/api.ts";
 
 function formatUptime(seconds: number): string {
   const d = Math.floor(seconds / 86400);
@@ -36,7 +36,11 @@ function getNextSunday(): string {
 
 interface StatusCardProps {
   health: HealthStatus;
-  asset: Asset | undefined;
+  /**
+   * Either the full admin `Asset` row or the sanitized `PublicStatus`.
+   * Only `pair` and `buyAmount` are read here.
+   */
+  asset: Asset | PublicStatus | undefined;
 }
 
 export function StatusCard({ health, asset }: StatusCardProps) {

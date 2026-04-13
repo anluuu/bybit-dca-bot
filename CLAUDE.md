@@ -121,7 +121,7 @@ These came from real decisions during development. Don't change them without thi
 
 3. **Multi-coin extensibility via the `assets` table.** Adding ETH/BRL is `INSERT INTO assets ...`, not a code change. Don't hardcode pair-specific logic in `strategy.ts`.
 
-4. **Public dashboard exposes summaries only, not order details.** The split between `/api/public/*` and `/api/*` (auth-required) is intentional. Don't leak order IDs, fees, or per-trade details to the public view.
+4. **Public dashboard exposes sanitized operational data; escalatable fields stay admin-only.** `/api/public/*` returns the full purchase history, monthly breakdown, cumulative chart, summary, and next-scheduled-buy info — but strips `bybitOrderId` (vendor-side identifier), `errorMessage` (may contain stack traces or API-key fragments), DB primary keys, and strategy-tuning asset fields (`limitDiscount`, `limitWaitMins`). `/api/orders` (raw Drizzle rows), `/api/assets` (full config), and `/api/test/*` (real-trade execution) remain behind `authPreHandler`. When adding a new public endpoint, `select()` explicit columns — never spread a raw row.
 
 5. **Bot is never publicly exposed.** Only the `web` (nginx) container is reachable from the internet via Traefik (Dokploy's reverse proxy). The bot uses `expose: ["3000"]` (internal Docker network only). nginx proxies `/api/*` and `/health/*` to `bot:3000`. Don't add a `ports:` entry or Traefik labels to the bot service.
 

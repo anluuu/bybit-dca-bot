@@ -13,4 +13,7 @@ export type {
   TestOrderResult,
   MonthlyBreakdown,
   PublicMonthlyBreakdown,
+  PublicOrder,
+  PublicOrdersPage,
+  PublicStatus,
 } from "@dca/shared";
