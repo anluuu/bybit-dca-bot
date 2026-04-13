@@ -18,7 +18,7 @@ import { executeTestOrder } from "./strategy.js";
 import { getTickerPrice, ExchangeClientError } from "./exchange.js";
 import { getMonthlySpent } from "./spending.js";
 import { getCompositeSignal } from "./signals/compose.js";
-import type { PublicSignals, AdminSignals } from "@dca/shared";
+import type { PublicSignals } from "@dca/shared";
 
 const startTime = Date.now();
 
@@ -511,52 +511,6 @@ export async function startServer(redisConnection: Redis) {
 
   app.get("/api/assets", authPreHandler, async () => {
     return db.select().from(assets);
-  });
-
-  /**
-   * Live signal snapshot (admin).
-   *
-   * Superset of the public endpoint: exposes absolute BRL envelope, the
-   * multiplier that would be applied to the next DCA, and the preview buy
-   * amount (buyAmount × multiplier, clamped to monthlyRemaining). Useful for
-   * operator sanity-checking before the next scheduled Sunday.
-   */
-  app.get("/api/admin/signals", authPreHandler, async (_req, reply) => {
-    const [firstAsset] = await db.select().from(assets).limit(1);
-    if (!firstAsset) {
-      return reply.status(404).send({ error: "No asset configured" });
-    }
-
-    const signal = await getCompositeSignal(firstAsset.pair);
-    const spent = await getMonthlySpent(firstAsset.pair);
-    const cap = parseFloat(firstAsset.monthlyCap);
-    const baseBuy = parseFloat(firstAsset.buyAmount);
-    const remaining = Math.max(cap - spent, 0);
-    const capUtilizationPct = cap > 0 ? (spent / cap) * 100 : null;
-
-    // Preview: what WOULD be applied if a DCA fired right now.
-    const candidate = baseBuy * signal.multiplier;
-    const previewAmountBrl = Math.min(candidate, remaining);
-
-    const payload: AdminSignals = {
-      mayerMultiple: signal.mayer ? signal.mayer.multiple : null,
-      ma200wDistancePct: signal.ma200w ? signal.ma200w.distancePct : null,
-      fearGreedIndex: signal.fearGreed ? signal.fearGreed.value : null,
-      fearGreedClassification: signal.fearGreed
-        ? signal.fearGreed.classification
-        : null,
-      compositeScore:
-        signal.fallback === "all_down" ? null : signal.composite,
-      capUtilizationPct,
-      fallback: signal.fallback,
-      generatedAt: signal.generatedAt,
-      nextBuyMultiplier: signal.multiplier,
-      monthlySpent: spent,
-      monthlyCap: cap,
-      monthlyRemaining: remaining,
-      previewAmountBrl,
-    };
-    return payload;
   });
 
   // --- Test order endpoints (admin-only, operator sanity-check) ---

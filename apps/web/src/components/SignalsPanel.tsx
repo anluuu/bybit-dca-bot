@@ -1,27 +1,20 @@
 import { Activity, AlertTriangle, TrendingUp } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import type { PublicSignals, AdminSignals } from "../lib/api.ts";
-import {
-  formatCurrency,
-  formatCurrencyCompact,
-  formatNumber,
-} from "../lib/format.ts";
+import type { PublicSignals } from "../lib/api.ts";
+import { formatNumber } from "../lib/format.ts";
 
 /**
- * Live snapshot of the market signals that drive the bot's buy-size modulation.
+ * Live snapshot of the market signals that contextualize every DCA buy.
  *
- * Renders three tiles (Mayer Multiple, 200W MA distance, Fear & Greed), a
- * composite bar scaled −1..+1 (expensive ↔ cheap), and — in admin mode only —
- * the multiplier that would be applied to the next DCA plus the BRL preview.
- *
- * Works with either:
- *   - PublicSignals (`variant="public"`): no multiplier, no absolute BRL cap
- *   - AdminSignals  (`variant="admin"`):  full envelope visible
+ * Renders three tiles (Mayer Multiple, 200W MA distance, Fear & Greed) and
+ * a composite bar scaled -1..+1 (expensive ↔ cheap). Same shape for admin
+ * and public — no strategy-internal info is exposed anywhere, since the
+ * bot does not modulate its buy size based on these signals.
  */
 
-type Props =
-  | { variant: "public"; data: PublicSignals | undefined }
-  | { variant: "admin"; data: AdminSignals | undefined };
+interface Props {
+  data: PublicSignals | undefined;
+}
 
 function formatSignalNumber(value: number | null, digits: number): string {
   if (value === null || !Number.isFinite(value)) return "—";
@@ -100,9 +93,8 @@ function accentFearGreed(value: number | null): "cheap" | "expensive" | "neutral
   return "neutral";
 }
 
-export function SignalsPanel(props: Props) {
+export function SignalsPanel({ data }: Props) {
   const { t } = useTranslation();
-  const { variant, data } = props;
 
   if (!data) {
     return (
@@ -135,9 +127,7 @@ export function SignalsPanel(props: Props) {
           {t("signals.title")}
         </h2>
         <span className="ml-auto text-xs text-surface-400">
-          {variant === "admin"
-            ? t("signals.subtitleAdmin")
-            : t("signals.subtitlePublic")}
+          {t("signals.subtitle")}
         </span>
       </div>
 
@@ -204,38 +194,8 @@ export function SignalsPanel(props: Props) {
         </div>
       </div>
 
-      {/* Admin-only envelope block */}
-      {variant === "admin" && (
-        <div className="mt-4 grid grid-cols-3 gap-3 border-t border-surface-700/30 pt-4">
-          <div>
-            <p className="text-[10px] uppercase tracking-wider text-surface-400">
-              {t("signals.nextMultiplier")}
-            </p>
-            <p className="mt-1 font-mono text-lg font-medium tabular-nums text-amber-glow">
-              {formatSignalNumber(data.nextBuyMultiplier, 2)}×
-            </p>
-          </div>
-          <div>
-            <p className="text-[10px] uppercase tracking-wider text-surface-400">
-              {t("signals.previewAmount")}
-            </p>
-            <p className="mt-1 font-mono text-lg font-medium tabular-nums text-surface-100">
-              {formatCurrencyCompact(data.previewAmountBrl)}
-            </p>
-          </div>
-          <div>
-            <p className="text-[10px] uppercase tracking-wider text-surface-400">
-              {t("signals.capRemaining")}
-            </p>
-            <p className="mt-1 font-mono text-lg font-medium tabular-nums text-surface-100">
-              {formatCurrency(data.monthlyRemaining)}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Public view shows just the cap utilization % (no absolute BRL) */}
-      {variant === "public" && data.capUtilizationPct !== null && (
+      {/* Cap utilization — same % on both dashboards. */}
+      {data.capUtilizationPct !== null && (
         <p className="mt-4 border-t border-surface-700/30 pt-3 font-mono text-xs text-surface-400">
           {t("signals.capUsedPct", {
             pct: data.capUtilizationPct.toFixed(0),
@@ -243,9 +203,8 @@ export function SignalsPanel(props: Props) {
         </p>
       )}
 
-      {/* Fallback badge — surfaces degraded signal state, or modulation-off
-          notice in admin mode when multiplier is 1.0 AND fallback is none
-          (means feature flag is disabled). */}
+      {/* Fallback badge — surfaces degraded signal state (one or more sources
+          currently unavailable). */}
       {fallbackMsg && (
         <div className="mt-3 flex items-start gap-2 rounded-md border border-amber-glow/20 bg-amber-glow/5 px-3 py-2">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-glow" />

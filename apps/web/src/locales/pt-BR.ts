@@ -71,7 +71,6 @@ export const ptBR = {
       status: "Status",
       mayer: "Mayer",
       fearGreed: "F&G",
-      multiplier: "Mult",
     },
     empty: {
       title: "Aguardando o primeiro preenchimento",
@@ -81,7 +80,6 @@ export const ptBR = {
     filled: "preenchida",
     failed: "falhou",
     skipped_cap: "limite atingido",
-    skipped_min_order: "abaixo do mínimo",
     cancelled: "cancelada",
     pending: "pendente",
   },
@@ -167,8 +165,7 @@ export const ptBR = {
   },
   signals: {
     title: "Sinais de mercado",
-    subtitleAdmin: "contexto da próxima compra",
-    subtitlePublic: "contexto do mercado atual",
+    subtitle: "contexto do mercado atual",
     mayerMultiple: "Mayer Multiple",
     mayerHint: "preço / média de 200d",
     ma200w: "Distância MM 200s",
@@ -177,9 +174,6 @@ export const ptBR = {
     fearGreedHint: "índice de medo & ganância",
     composite: "Composto",
     compositeScale: "caro ↔ barato",
-    nextMultiplier: "Multiplicador da próxima compra",
-    previewAmount: "Compra prevista",
-    capRemaining: "Cap restante",
     capUsedPct: "{{pct}}% do cap usado",
     loading: "carregando sinais…",
     classification: {
@@ -193,9 +187,8 @@ export const ptBR = {
       none: "",
       feargreed_down: "Fear & Greed indisponível — usando Mayer + MM200s",
       klines_down: "Dados de preço indisponíveis — usando só Fear & Greed",
-      all_down: "Todos os sinais indisponíveis — comprando no valor base (1×)",
+      all_down: "Todos os sinais indisponíveis no momento",
     },
-    flatBuy: "Compras aplainadas (modulação desativada)",
   },
 };
 

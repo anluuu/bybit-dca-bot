@@ -7,16 +7,12 @@ export type OrderStatus =
   | "filled"
   | "cancelled"
   | "failed"
-  | "skipped_cap"
-  // New in signal-aware DCA: fires when the composite multiplier would have
-  // produced a buy amount below Bybit's minimum order size — distinct from
-  // skipped_cap so the dashboard can explain *why* a week was skipped.
-  | "skipped_min_order";
+  | "skipped_cap";
 
 /**
- * Why the composite score had to fall back to a degraded mode, or "none" if
- * all three signals resolved. When "all_down" the bot buys at 1× (flat DCA)
- * so we never miss a scheduled buy because of signal infrastructure.
+ * Why the composite signal had to fall back to a degraded mode, or "none"
+ * when all three signals resolved. Surfaces as a "data partially unavailable"
+ * badge on the dashboard; the bot still buys at its baseline regardless.
  */
 export type SignalFallback =
   | "none"
@@ -39,12 +35,12 @@ export interface Order {
   errorMessage: string | null;
   isTest: boolean;
   // Signal snapshot at order placement. All nullable for historical rows and
-  // for orders placed when signals were unavailable.
+  // for orders placed when signals were unavailable. These are captured for
+  // dashboard context only — the bot's buy size does not react to them.
   mayerMultiple: string | null;
   ma200wDistancePct: string | null;
   fearGreedIndex: number | null;
   compositeScore: string | null;
-  appliedMultiplier: string | null;
   signalFallback: string | null;
   executedAt: string;
   createdAt: string;
@@ -163,11 +159,8 @@ export type PublicMonthlyBreakdown = MonthlyBreakdown;
  * API-key fragments), the is_test flag (public orders are always is_test=false),
  * and created_at (only executedAt is interesting to a viewer).
  *
- * Also strips strategy-internal signal fields:
- *   - compositeScore / appliedMultiplier: reveal the internal scoring function
- *     and in-flight sizing decisions; public visitors see raw index values
- *     (mayer, ma200w, fg) which are market data and safe to expose.
- *   - signalFallback: surfaces our internal degradation tree; admin-only.
+ * Also strips internal scoring fields (compositeScore, signalFallback) —
+ * public visitors see the raw market indicators (mayer, ma200w, fg) only.
  */
 export type PublicOrder = Omit<
   Order,
@@ -178,7 +171,6 @@ export type PublicOrder = Omit<
   | "isTest"
   | "createdAt"
   | "compositeScore"
-  | "appliedMultiplier"
   | "signalFallback"
 >;
 
@@ -215,16 +207,13 @@ export interface AuthUser {
 }
 
 /**
- * Live signal snapshot served by GET /api/public/signals.
+ * Live market-signal snapshot served by GET /api/public/signals.
  *
- * Public visitors see the raw market indicators (Mayer, 200W MA distance,
- * Fear & Greed) and the monthly *utilization percentage*. We deliberately
- * hide absolute BRL cap remaining and the multiplier that *would* be applied
- * to the next DCA — those are strategy-tuning values that leak the bot's
- * internal decision function when a buy is imminent.
- *
- * When `fallback !== "none"` some signals failed to resolve and the composite
- * falls back to a degraded path (or flat 1× buys when "all_down").
+ * Exposes the three indicators that contextualize every DCA buy (Mayer
+ * Multiple, 200W MA distance, Fear & Greed) and the monthly cap utilization.
+ * The bot does NOT modulate its buy size based on these — they're purely
+ * informational context for the dashboard. `fallback !== "none"` when a
+ * signal source is unavailable.
  */
 export interface PublicSignals {
   mayerMultiple: number | null;
@@ -233,22 +222,8 @@ export interface PublicSignals {
   fearGreedClassification: string | null;
   /** Equal-weighted composite of the non-null signals. -1 = expensive, +1 = cheap. */
   compositeScore: number | null;
-  /** % of the monthly cap already spent — does NOT expose the absolute BRL. */
+  /** % of the monthly cap already spent. */
   capUtilizationPct: number | null;
   fallback: SignalFallback;
   generatedAt: string;
-}
-
-/**
- * Admin variant of PublicSignals with the absolute BRL envelope and the
- * multiplier that would be applied to the next DCA. Behind authPreHandler.
- */
-export interface AdminSignals extends PublicSignals {
-  /** [0.5, 2.0] — would be applied if a DCA fired right now. */
-  nextBuyMultiplier: number;
-  monthlySpent: number;
-  monthlyCap: number;
-  monthlyRemaining: number;
-  /** buyAmount × nextBuyMultiplier, then clamped to monthlyRemaining. */
-  previewAmountBrl: number;
 }

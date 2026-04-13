@@ -19,8 +19,8 @@ import {
 
 /**
  * Display shape shared by admin `Order` and sanitized `PublicOrder`.
- * Fields missing in PublicOrder (`id`, `isTest`, `appliedMultiplier`, etc.)
- * are optional here so both types are assignable.
+ * Fields missing in PublicOrder (`id`, `isTest`) are optional here so both
+ * types are assignable.
  */
 type OrderRow = {
   id?: number;
@@ -38,8 +38,6 @@ type OrderRow = {
   // Historical rows degrade to "—" in the UI.
   mayerMultiple?: string | null;
   fearGreedIndex?: number | null;
-  // Admin-only. Publicly sanitized Order type strips this field.
-  appliedMultiplier?: string | null;
 };
 
 interface OrdersTableProps {
@@ -48,11 +46,6 @@ interface OrdersTableProps {
   totalPages?: number;
   total?: number;
   onPageChange?: (page: number) => void;
-  /**
-   * "admin" renders the strategy-internal multiplier column; "public" omits it.
-   * Defaults to "public" (the safer option for external view).
-   */
-  variant?: "admin" | "public";
 }
 
 type SortKey = "executedAt" | "fiatSpent" | "price";
@@ -63,7 +56,6 @@ function StatusBadge({ status }: { status: string }) {
     filled: "bg-green-gain/10 text-green-gain border-green-gain/20",
     failed: "bg-red-loss/10 text-red-loss border-red-loss/20",
     skipped_cap: "bg-amber-glow/10 text-amber-glow border-amber-glow/20",
-    skipped_min_order: "bg-amber-glow/10 text-amber-glow border-amber-glow/20",
     cancelled: "bg-surface-500/10 text-surface-400 border-surface-500/20",
     pending: "bg-violet-tech/10 text-violet-tech border-violet-tech/20",
   };
@@ -83,14 +75,12 @@ export function OrdersTable({
   totalPages,
   total,
   onPageChange,
-  variant = "public",
 }: OrdersTableProps) {
   const { t } = useTranslation();
   const [sortKey, setSortKey] = useState<SortKey>("executedAt");
   const [sortAsc, setSortAsc] = useState(false);
 
   const rows: OrderRow[] = orders as unknown as OrderRow[];
-  const showMultiplierColumn = variant === "admin";
 
   if (rows.length === 0) {
     return (
@@ -205,11 +195,6 @@ export function OrdersTable({
               <th className="px-3 py-3 text-right">
                 {t("orders.columns.fearGreed")}
               </th>
-              {showMultiplierColumn && (
-                <th className="px-3 py-3 text-right">
-                  {t("orders.columns.multiplier")}
-                </th>
-              )}
               <th className="px-3 py-3">{t("orders.columns.status")}</th>
             </tr>
           </thead>
@@ -271,13 +256,6 @@ export function OrdersTable({
                 <td className="px-3 py-3 text-right font-mono text-xs tabular-nums text-surface-300">
                   {order.fearGreedIndex ?? "—"}
                 </td>
-                {showMultiplierColumn && (
-                  <td className="px-3 py-3 text-right font-mono text-xs tabular-nums text-amber-glow">
-                    {order.appliedMultiplier
-                      ? `${parseFloat(order.appliedMultiplier).toFixed(2)}×`
-                      : "—"}
-                  </td>
-                )}
                 <td className="px-3 py-3">
                   <StatusBadge status={order.status} />
                 </td>

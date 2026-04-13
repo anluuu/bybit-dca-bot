@@ -33,12 +33,6 @@ export interface OrderResult {
   fiatSpent: number;
   fee: number;
   feeCurrency: string;
-  /**
-   * Applied signal multiplier. 1.0 means either the feature flag is off or
-   * the composite landed exactly neutral. We surface it only when it's
-   * meaningfully off 1.0 so typical flat buys stay terse.
-   */
-  multiplier: number;
 }
 
 export async function notifySuccess(details: OrderResult): Promise<void> {
@@ -60,21 +54,13 @@ export async function notifySuccess(details: OrderResult): Promise<void> {
   const feeCur = escapeMarkdown(details.feeCurrency);
   const type = escapeMarkdown(details.orderType.toUpperCase());
 
-  // Only surface the multiplier line when the bot actually modulated the buy
-  // — avoids noisy 1.00× stamps on every flat DCA.
-  const multiplierLine =
-    Math.abs(details.multiplier - 1) > 0.01
-      ? `\n*Multiplier:* ${escapeMarkdown(details.multiplier.toFixed(2))}x`
-      : "";
-
   const msg =
     `*BTC Purchased* \\(${type}\\)\n\n` +
     `*Pair:* ${pair}\n` +
     `*Amount:* ${qty} BTC\n` +
     `*Price:* R\\$${price}\n` +
     `*Spent:* R\\$${spent}\n` +
-    `*Fee:* ${fee} ${feeCur}` +
-    multiplierLine;
+    `*Fee:* ${fee} ${feeCur}`;
 
   await send(msg);
 }

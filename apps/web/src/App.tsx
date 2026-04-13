@@ -23,7 +23,6 @@ import type {
   PublicOrdersPage,
   PublicStatus,
   PublicSignals,
-  AdminSignals,
 } from "./lib/api.ts";
 
 const queryClient = new QueryClient({
@@ -79,17 +78,6 @@ function useMonthly() {
     queryFn: async () => {
       const res = await fetch("/api/orders/monthly", { credentials: "include" });
       if (!res.ok) throw new Error(`Failed to load monthly (${res.status})`);
-      return res.json();
-    },
-  });
-}
-
-function useAdminSignals() {
-  return useQuery<AdminSignals>({
-    queryKey: ["admin-signals"],
-    queryFn: async () => {
-      const res = await fetch("/api/admin/signals", { credentials: "include" });
-      if (!res.ok) throw new Error(`Failed to load signals (${res.status})`);
       return res.json();
     },
   });
@@ -221,10 +209,9 @@ function AdminDashboard() {
   const { data: summary, error: summaryError } = useSummary();
   const { data: monthly, error: monthlyError } = useMonthly();
   const { data: health } = useHealth();
-  // Signals are non-critical — if they fail, the dashboard still renders the
-  // rest of the cards. No point gating the whole view on an upstream market-
-  // data fetch.
-  const { data: signals } = useAdminSignals();
+  // Signals are non-critical — if the market-data fetch fails the rest of the
+  // dashboard still renders. Shared with the public dashboard (same endpoint).
+  const { data: signals } = usePublicSignals();
 
   const apiError = ordersError || assetsError || summaryError || monthlyError;
 
@@ -271,7 +258,7 @@ function AdminDashboard() {
       )}
 
       <div className="mb-6">
-        <SignalsPanel variant="admin" data={signals} />
+        <SignalsPanel data={signals} />
       </div>
 
       {ordersPage && (
@@ -291,7 +278,6 @@ function AdminDashboard() {
               totalPages={ordersPage.totalPages}
               total={ordersPage.total}
               onPageChange={setPage}
-              variant="admin"
             />
           </div>
         </>
@@ -365,7 +351,7 @@ function PublicDashboard() {
       )}
 
       <div className="mb-6">
-        <SignalsPanel variant="public" data={signals} />
+        <SignalsPanel data={signals} />
       </div>
 
       {chartPoints && (

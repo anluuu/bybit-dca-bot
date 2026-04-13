@@ -67,7 +67,6 @@ export const en: Translations = {
       status: "Status",
       mayer: "Mayer",
       fearGreed: "F&G",
-      multiplier: "Mult",
     },
     empty: {
       title: "Waiting for the first fill",
@@ -77,7 +76,6 @@ export const en: Translations = {
     filled: "filled",
     failed: "failed",
     skipped_cap: "skipped cap",
-    skipped_min_order: "below min",
     cancelled: "cancelled",
     pending: "pending",
   },
@@ -162,8 +160,7 @@ export const en: Translations = {
   },
   signals: {
     title: "Market signals",
-    subtitleAdmin: "next buy context",
-    subtitlePublic: "current market context",
+    subtitle: "current market context",
     mayerMultiple: "Mayer Multiple",
     mayerHint: "price / 200d MA",
     ma200w: "200W MA distance",
@@ -172,9 +169,6 @@ export const en: Translations = {
     fearGreedHint: "fear & greed index",
     composite: "Composite",
     compositeScale: "expensive ↔ cheap",
-    nextMultiplier: "Next-buy multiplier",
-    previewAmount: "Preview buy",
-    capRemaining: "Cap remaining",
     capUsedPct: "{{pct}}% of cap used",
     loading: "loading signals…",
     classification: {
@@ -188,8 +182,7 @@ export const en: Translations = {
       none: "",
       feargreed_down: "Fear & Greed unavailable — using Mayer + 200W MA",
       klines_down: "Price data unavailable — using Fear & Greed only",
-      all_down: "All signals unavailable — buying at baseline (1×)",
+      all_down: "All signals currently unavailable",
     },
-    flatBuy: "Flat buys (modulation disabled)",
   },
 };

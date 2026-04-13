@@ -5,8 +5,3 @@ dist/
 .env.test
 .DS_Store
 .playwright-mcp/
-
-# Historical data fetched by `pnpm --filter @dca/bot fetch-backtest-data`.
-# Tens of MB, easy to regenerate, and external data shouldn't live in git.
-data/
-apps/bot/data/

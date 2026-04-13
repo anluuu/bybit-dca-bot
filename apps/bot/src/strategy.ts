@@ -20,7 +20,6 @@ import {
   notifyFallback,
 } from "./notifications.js";
 import { getCompositeSignal, type CompositeSignal } from "./signals/compose.js";
-import { config } from "./config.js";
 import { logger } from "./logger.js";
 
 function sleep(ms: number): Promise<void> {
@@ -52,12 +51,7 @@ async function waitForOrderFill(
   return getOrderDetail(pair, orderId);
 }
 
-function recordOrderResult(
-  detail: OrderDetail,
-  pair: string,
-  orderType: string,
-  multiplier: number
-) {
+function recordOrderResult(detail: OrderDetail, pair: string, orderType: string) {
   return {
     pair,
     orderType,
@@ -66,18 +60,14 @@ function recordOrderResult(
     fiatSpent: parseFloat(detail.cumExecValue),
     fee: parseFloat(detail.cumExecFee),
     feeCurrency: detail.feeCurrency,
-    multiplier,
   };
 }
 
 /**
- * Project a CompositeSignal (+ applied multiplier) into the Drizzle-insertable
- * columns added by migration 0002. `appliedMultiplier` is explicit because the
- * multiplier stored on the row is what we actually used — which may differ
- * from `signal.multiplier` if modulation is disabled via feature flag (stored
- * as 1.00) or if the cap clamp reduced it.
+ * Project a resolved CompositeSignal into the signal columns on the orders
+ * row. Captured purely for dashboard context — no bot behavior reads these.
  */
-function signalColumns(signal: CompositeSignal, appliedMultiplier: number) {
+function signalColumns(signal: CompositeSignal) {
   return {
     mayerMultiple: signal.mayer ? signal.mayer.multiple.toFixed(4) : null,
     ma200wDistancePct: signal.ma200w
@@ -85,7 +75,6 @@ function signalColumns(signal: CompositeSignal, appliedMultiplier: number) {
       : null,
     fearGreedIndex: signal.fearGreed ? signal.fearGreed.value : null,
     compositeScore: signal.composite.toFixed(4),
-    appliedMultiplier: appliedMultiplier.toFixed(2),
     signalFallback: signal.fallback,
   };
 }
@@ -99,12 +88,9 @@ export async function executeDca(asset: Asset): Promise<void> {
 
   logger.info("Starting DCA execution", { pair, buyAmount });
 
-  // 1. Check monthly spending cap (using the baseline buyAmount to avoid
-  // skipping a week just because the modulation could have gone high). The
-  // signal clamp below is what actually governs spend.
+  // 1. Check monthly spending cap
   const spent = await getMonthlySpent(pair);
-  const remaining = monthlyCap - spent;
-  if (remaining < config.MIN_ORDER_BRL) {
+  if (spent + buyAmount > monthlyCap) {
     logger.info("Monthly cap reached, skipping", { pair, spent, monthlyCap });
 
     await db.insert(orders).values({
@@ -118,54 +104,13 @@ export async function executeDca(asset: Asset): Promise<void> {
     return;
   }
 
-  // 2. Capture signals BEFORE placing the order. Signals are always captured
-  // (for historical analysis on order rows); whether they actually modulate
-  // the buy amount is gated by SIGNAL_MODULATION_ENABLED.
+  // 2. Fetch signal snapshot for dashboard context. The buy size does not
+  // react to these — they're captured on the order row so every buy carries
+  // the market context it was placed in. Failure is already absorbed inside
+  // getCompositeSignal (graceful fallback tree), so we don't guard here.
   const signal = await getCompositeSignal(pair);
 
-  // 3. Compute effective buy amount.
-  //   - modulation disabled  → effective = buyAmount (legacy flat behavior)
-  //   - modulation enabled   → effective = buyAmount × multiplier, clamped
-  //                             to remaining monthly cap
-  const candidateAmount = config.SIGNAL_MODULATION_ENABLED
-    ? buyAmount * signal.multiplier
-    : buyAmount;
-  const effectiveAmount = Math.min(candidateAmount, remaining);
-  const clampedByCap = effectiveAmount < candidateAmount;
-  // The multiplier we actually applied (may be < signal.multiplier if clamped,
-  // or 1.0 if the feature flag is off).
-  const appliedMultiplier = effectiveAmount / buyAmount;
-
-  logger.info("Signal-aware DCA plan", {
-    pair,
-    baseBuyAmount: buyAmount,
-    signalMultiplier: signal.multiplier,
-    candidateAmount,
-    effectiveAmount,
-    monthlyRemaining: remaining,
-    cappedFromMultiplier: clampedByCap,
-    fallback: signal.fallback,
-    modulationEnabled: config.SIGNAL_MODULATION_ENABLED,
-  });
-
-  if (effectiveAmount < config.MIN_ORDER_BRL) {
-    logger.info("Effective buy below min order size, skipping", {
-      pair,
-      effectiveAmount,
-      minOrder: config.MIN_ORDER_BRL,
-    });
-
-    await db.insert(orders).values({
-      assetId,
-      pair,
-      orderType: "limit",
-      status: "skipped_min_order",
-      ...signalColumns(signal, appliedMultiplier),
-    });
-    return;
-  }
-
-  // 4. Fetch current price (used for the limit price calculation).
+  // 3. Fetch current price
   let currentPrice: number;
   try {
     currentPrice = await getTickerPrice(pair);
@@ -176,15 +121,15 @@ export async function executeDca(asset: Asset): Promise<void> {
     throw error;
   }
 
-  // 5. Calculate limit order params from effectiveAmount (not buyAmount).
+  // 4. Calculate limit order params
   const limitPrice = currentPrice * (1 - limitDiscount / 100);
-  const quantity = effectiveAmount / limitPrice;
+  const quantity = buyAmount / limitPrice;
 
   // Round price to 2 decimals, quantity to 6 decimals (Bybit BTC/BRL typical)
   const priceStr = limitPrice.toFixed(2);
   const qtyStr = quantity.toFixed(6);
 
-  // 6. Place limit order
+  // 5. Place limit order
   let limitOrderId: string;
   try {
     limitOrderId = await placeLimitOrder(pair, qtyStr, priceStr);
@@ -195,8 +140,7 @@ export async function executeDca(asset: Asset): Promise<void> {
     throw error;
   }
 
-  // 7. Record pending order (with signal snapshot so it's visible even while
-  //    the order is mid-flight).
+  // 6. Record pending order (with signal snapshot for dashboard badges).
   const [insertedOrder] = await db
     .insert(orders)
     .values({
@@ -205,11 +149,11 @@ export async function executeDca(asset: Asset): Promise<void> {
       orderType: "limit",
       bybitOrderId: limitOrderId,
       status: "pending",
-      ...signalColumns(signal, appliedMultiplier),
+      ...signalColumns(signal),
     })
     .returning({ id: orders.id });
 
-  // 6. Poll for limit order fill
+  // 7. Poll for limit order fill
   const pollIntervalMs = 30_000;
   const maxPolls = Math.ceil((limitWaitMins * 60_000) / pollIntervalMs);
 
@@ -231,9 +175,7 @@ export async function executeDca(asset: Asset): Promise<void> {
         })
         .where(eq(orders.id, insertedOrder.id));
 
-      await notifySuccess(
-        recordOrderResult(detail, pair, "limit", appliedMultiplier)
-      );
+      await notifySuccess(recordOrderResult(detail, pair, "limit"));
       logger.info("Limit order filled", { pair, orderId: limitOrderId });
       return;
     }
@@ -267,7 +209,7 @@ export async function executeDca(asset: Asset): Promise<void> {
     });
   }
 
-  // 7. Limit order not filled — cancel and fallback to market
+  // 8. Limit order not filled — cancel and fallback to market
   logger.info("Limit order not filled, falling back to market", {
     pair,
     orderId: limitOrderId,
@@ -290,11 +232,10 @@ export async function executeDca(asset: Asset): Promise<void> {
 
   await notifyFallback(pair, limitOrderId);
 
-  // 8. Place market order using the SAME effectiveAmount the limit order used,
-  //    so the modulation decision propagates end-to-end.
+  // 9. Place market order
   let marketOrderId: string;
   try {
-    marketOrderId = await placeMarketOrder(pair, effectiveAmount.toFixed(2));
+    marketOrderId = await placeMarketOrder(pair, buyAmount.toFixed(2));
   } catch (error) {
     if (error instanceof ExchangeClientError) {
       throw new UnrecoverableError(error.message);
@@ -302,7 +243,7 @@ export async function executeDca(asset: Asset): Promise<void> {
     throw error;
   }
 
-  // 9. Poll market order with retries (not just a single sleep)
+  // 10. Poll market order with retries (not just a single sleep)
   const marketDetail = await waitForOrderFill(pair, marketOrderId, 5, 2_000);
 
   const isFilled =
@@ -321,13 +262,11 @@ export async function executeDca(asset: Asset): Promise<void> {
     fiatSpent: parseFloat(marketDetail.cumExecValue).toFixed(2),
     fee: marketDetail.cumExecFee,
     feeCurrency: marketDetail.feeCurrency,
-    ...signalColumns(signal, appliedMultiplier),
+    ...signalColumns(signal),
   });
 
   if (isFilled) {
-    await notifySuccess(
-      recordOrderResult(marketDetail, pair, "market", appliedMultiplier)
-    );
+    await notifySuccess(recordOrderResult(marketDetail, pair, "market"));
     logger.info("Market fallback order filled", {
       pair,
       orderId: marketOrderId,
