@@ -50,10 +50,17 @@ services:
       - "80"
     labels:
       - "traefik.enable=true"
+      # HTTPS router (serves the app over TLS with Let's Encrypt cert)
       - "traefik.http.routers.dca-bot-web.rule=Host(`dca-bot.luancunha.dev`)"
       - "traefik.http.routers.dca-bot-web.entrypoints=websecure"
       - "traefik.http.routers.dca-bot-web.tls.certResolver=letsencrypt"
       - "traefik.http.services.dca-bot-web.loadbalancer.server.port=80"
+      # HTTP router (required for ACME HTTP-01 challenge; also redirects visitors to HTTPS)
+      - "traefik.http.routers.dca-bot-web-http.rule=Host(`dca-bot.luancunha.dev`)"
+      - "traefik.http.routers.dca-bot-web-http.entrypoints=web"
+      - "traefik.http.routers.dca-bot-web-http.middlewares=dca-bot-redirect-to-https"
+      - "traefik.http.middlewares.dca-bot-redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.dca-bot-redirect-to-https.redirectscheme.permanent=true"
     networks:
       - dokploy-network
     restart: unless-stopped
