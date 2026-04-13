@@ -16,6 +16,8 @@ Buys a fixed BRL amount of BTC every Sunday using a "gentle discount with market
 - **BullMQ-backed scheduling** — jobs survive restarts, built-in retries
 - **Admin dashboard** with order history, accumulation chart, monthly progress
 - **Public read-only view** for sharing summary stats
+- **Admin-triggered test orders** — small real market buys between weekly DCAs to verify the Bybit pipeline end-to-end (tagged `is_test=true`, excluded from cap and aggregates)
+- **Health endpoint** — `/health/ready` reports Postgres + Redis connectivity for uptime monitors
 - **Multi-coin ready** — adding ETH/SOL/etc. is a row in the `assets` table
 
 ---
@@ -170,6 +172,7 @@ All configuration is via environment variables. See `.env.example` for the full 
 | `LIMIT_DISCOUNT_PCT` | `0.3` | Discount below market for limit order |
 | `LIMIT_WAIT_MINUTES` | `120` | How long to wait for limit fill |
 | `TRADING_PAIR` | `BTCBRL` | Bybit spot pair |
+| `TEST_ORDER_AMOUNT_BRL` | `10` | BRL size for admin-triggered test orders |
 | `ADMIN_USERNAME` | `admin` | Dashboard login username |
 
 ### Local-dev only (overridden in production by docker-compose.yml)
@@ -186,10 +189,29 @@ All configuration is via environment variables. See `.env.example` for the full 
 
 Two views (same URL):
 
-- **Public** (`/`): bot status, monthly spending progress, accumulation chart. No order details.
-- **Admin** (`/#login`): full purchase history with pagination, all charts and stats.
+- **Public** (`/`): bot status indicator, monthly spending progress, accumulation chart. No order details.
+- **Admin** (`/#login`): full purchase history with pagination, all charts and stats, plus a **test-order card** for triggering a small real market buy to verify the Bybit pipeline between weekly DCAs.
 
-Login uses JWT in an httpOnly cookie. Rate-limited to 5 attempts/minute.
+Login uses JWT in an httpOnly cookie (7-day expiry). Rate-limited to 5 attempts/minute.
+
+### HTTP API surface
+
+All endpoints are served by the bot on port 3000 (nginx proxies `/api/*` and `/health/*` in production).
+
+| Endpoint | Auth | Purpose |
+|----------|------|---------|
+| `GET /health` | public | Basic uptime (process start + seconds) |
+| `GET /health/ready` | public | Readiness probe — reports Postgres + Redis status (503 if degraded) |
+| `GET /api/public/summary` | public | Totals + monthly progress (excludes test orders) |
+| `GET /api/public/chart` | public | Cumulative BTC + spend time series |
+| `POST /api/auth/login` | public | Rate-limited 5/min |
+| `POST /api/auth/logout` | public | Clears the `token` cookie |
+| `GET /api/auth/me` | cookie | Returns the logged-in admin identity |
+| `GET /api/orders` | admin | Paginated order history (`?page=&pageSize=`) |
+| `GET /api/orders/summary` | admin | Same shape as public summary |
+| `GET /api/assets` | admin | Configured trading pairs from the `assets` table |
+| `POST /api/test/preview` | admin | Preview a test order (rate-limit 10/min) — returns price, est. qty, busy flag |
+| `POST /api/test/execute` | admin | Execute a real market test order (rate-limit 2/min; 409 if a DCA is in flight) |
 
 ---
 
@@ -229,6 +251,7 @@ Login uses JWT in an httpOnly cookie. Rate-limited to 5 attempts/minute.
 | `pnpm dev` | Run all apps in dev mode (turbo) |
 | `pnpm build` | Build all apps (turbo, with caching) |
 | `pnpm typecheck` | Type-check all apps |
+| `pnpm lint` | Lint all apps (turbo) |
 | `pnpm dev:db` | Start dev databases (postgres + redis) |
 | `pnpm dev:db:down` | Stop dev databases |
 | `pnpm db:generate` | Generate Drizzle migration from schema changes |
@@ -251,9 +274,10 @@ pnpm --filter @dca/shared build
 - API keys are stripped from logs automatically by `logger.ts`
 - JWT tokens use httpOnly + sameSite=strict cookies
 - CSRF protection enabled on POST endpoints
-- Login endpoint rate-limited to 5/minute (brute-force protection)
+- Global rate limit 100/min, per-route overrides (login 5/min, test-preview 10/min, test-execute 2/min)
 - Bcrypt password hashing (12 rounds)
 - All admin API endpoints require authentication
+- Test-order execute endpoint blocks with 409 if a DCA is already mid-flight for the pair
 - Bot is not exposed publicly — only nginx (web container) is
 
 ---

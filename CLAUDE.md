@@ -42,16 +42,24 @@ A single Node.js service (`apps/bot/src/index.ts`) boots in this order: validate
 
 | What | Where |
 |------|-------|
-| DCA execution logic | `apps/bot/src/strategy.ts` (`executeDca`) |
+| Boot sequence / entry point | `apps/bot/src/index.ts` |
+| DCA execution logic | `apps/bot/src/strategy.ts` (`executeDca`, `executeTestOrder`) |
 | Bybit API calls | `apps/bot/src/exchange.ts` |
 | Cron schedule + retries | `apps/bot/src/queue.ts` (BullMQ) |
 | HTTP routes | `apps/bot/src/server.ts` |
 | DB schema (Drizzle) | `apps/bot/src/db/schema.ts` |
+| DB client | `apps/bot/src/db/client.ts` |
+| Monthly cap query | `apps/bot/src/spending.ts` (`getMonthlySpent`) |
 | Telegram messages | `apps/bot/src/notifications.ts` |
+| Structured logger | `apps/bot/src/logger.ts` |
+| Env var schema | `apps/bot/src/config.ts` |
 | Shared API types | `packages/shared/src/index.ts` |
-| Frontend root | `apps/web/src/App.tsx` |
+| Frontend root + routing | `apps/web/src/App.tsx` |
 | Auth context (frontend) | `apps/web/src/lib/auth.tsx` |
 | Frontend API types re-export | `apps/web/src/lib/api.ts` (re-exports from `@dca/shared`) |
+| Dashboard cards | `apps/web/src/components/{StatusCard,SpendingCard,AccumulationChart,OrdersTable,TestOrderCard}.tsx` |
+| Login page | `apps/web/src/components/LoginPage.tsx` |
+| Error boundary | `apps/web/src/components/ErrorBoundary.tsx` |
 | nginx config (prod proxy) | `apps/web/nginx.conf` |
 
 ---
@@ -87,7 +95,7 @@ When adding a new API endpoint:
 ### Frontend
 
 - **React 19** with hooks, no class components except `ErrorBoundary` (which has to be a class).
-- **TanStack Query** for all data fetching — never `useEffect(() => fetch())`. Default `refetchInterval` is 30s.
+- **TanStack Query** for all data fetching — never `useEffect(() => fetch())`. Default `refetchInterval` is 30s, `retry: 2`. The `/health/ready` query polls every 10s so the status pill stays fresh.
 - **Tailwind CSS v4** with custom theme tokens in `apps/web/src/index.css` (`--color-surface-*`, `--color-amber-glow`, etc.). Use these tokens, not arbitrary hex values.
 - **Lucide icons only.** No emoji as icons.
 - **JetBrains Mono for numbers/data**, DM Sans for everything else. Apply via `font-mono` and the default sans.
@@ -119,7 +127,11 @@ These came from real decisions during development. Don't change them without thi
 
 6. **Dokploy + Traefik for production deployment.** The `docker-compose.yml` joins the external `dokploy-network`. Web has Traefik labels for `dca-bot.luancunha.dev` with auto Let's Encrypt SSL. Don't change to `ports:` — that would bypass Traefik. Secrets like `POSTGRES_PASSWORD` are set in Dokploy's env UI, not in `.env.example`.
 
-6. **Idempotency on retries.** If a BullMQ retry runs after the limit order was already placed, the strategy should detect this and not place a duplicate. (Currently relies on the fact that retries happen after 5+ minutes, which is longer than the placement step. Improving this is on the P2 list.)
+7. **Idempotency on retries.** If a BullMQ retry runs after the limit order was already placed, the strategy should detect this and not place a duplicate. (Currently relies on the fact that retries happen after 5+ minutes, which is longer than the placement step. Improving this is on the P2 list.)
+
+8. **Test orders are isolated from real DCA accounting.** The `orders.is_test` column tags rows produced by `POST /api/test/execute` / `executeTestOrder()`. All aggregations (`/api/public/summary`, `/api/orders/summary`, chart, monthly-cap lookup in `spending.ts`) must include `AND is_test = false`. The test-execute endpoint also blocks with 409 if a real DCA has a pending order on the same pair within the last 10 min (see `findBusyReason` in `server.ts`).
+
+9. **Bybit V5 quirk: `orderStatus`, not `status`.** When reading an order back from Bybit's V5 REST API, the field is `orderStatus` (see fix in commit c431d2b). Don't regress this — it silently breaks fill detection because the field just comes back `undefined`.
 
 ---
 
@@ -216,6 +228,13 @@ The spec panel review identified these. None are blockers, but they're documente
 2. Add it to `.env.example` with a sane default or empty placeholder.
 3. Add it to `docker-compose.yml` under the `bot` service `environment:` block.
 4. Update the README config table.
+
+### Triggering a manual test order (from the dashboard)
+
+1. Log in as admin — the `TestOrderCard` appears at the bottom of the page.
+2. Click **Preview** to call `POST /api/test/preview` (rate-limited 10/min) — it returns live price, est. BTC qty, and a `busy` flag if a DCA is currently mid-flight.
+3. Click **Execute** to call `POST /api/test/execute` (rate-limited 2/min). This places a real market buy of `TEST_ORDER_AMOUNT_BRL` on Bybit. The row is persisted with `is_test=true` and will not appear in the accumulation chart / monthly cap.
+4. A 409 response means `findBusyReason` detected a `pending` order on the same pair within the last 10 minutes — wait for the DCA job to finish.
 
 ### Changing the DB schema
 
