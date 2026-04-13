@@ -1,13 +1,20 @@
+import { useState, useEffect } from "react";
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
-import { Bitcoin, LogIn, LogOut, Eye } from "lucide-react";
+import { Bitcoin, LogIn, LogOut, Eye, AlertTriangle } from "lucide-react";
 import { StatusCard } from "./components/StatusCard.tsx";
 import { SpendingCard } from "./components/SpendingCard.tsx";
 import { AccumulationChart } from "./components/AccumulationChart.tsx";
 import { OrdersTable } from "./components/OrdersTable.tsx";
 import { LoginPage } from "./components/LoginPage.tsx";
+import { ErrorBoundary } from "./components/ErrorBoundary.tsx";
 import { AuthProvider, useAuth } from "./lib/auth.tsx";
-import { mockOrders, mockAssets, mockSummary, mockHealth } from "./lib/mock-data.ts";
-import type { Order, Asset, OrdersSummary, HealthStatus } from "./lib/api.ts";
+import type {
+  Asset,
+  OrdersPage,
+  OrdersSummary,
+  HealthStatus,
+  ChartPoint,
+} from "./lib/api.ts";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -20,12 +27,15 @@ const queryClient = new QueryClient({
 
 // --- Hooks for authenticated (admin) data ---
 
-function useOrders() {
-  return useQuery<Order[]>({
-    queryKey: ["orders"],
+function useOrders(page: number, pageSize: number = 25) {
+  return useQuery<OrdersPage>({
+    queryKey: ["orders", page, pageSize],
     queryFn: async () => {
-      const res = await fetch("/api/orders", { credentials: "include" });
-      if (!res.ok) throw new Error("Unauthorized");
+      const res = await fetch(
+        `/api/orders?page=${page}&pageSize=${pageSize}`,
+        { credentials: "include" }
+      );
+      if (!res.ok) throw new Error(`Failed to load orders (${res.status})`);
       return res.json();
     },
   });
@@ -36,7 +46,7 @@ function useAssets() {
     queryKey: ["assets"],
     queryFn: async () => {
       const res = await fetch("/api/assets", { credentials: "include" });
-      if (!res.ok) throw new Error("Unauthorized");
+      if (!res.ok) throw new Error(`Failed to load assets (${res.status})`);
       return res.json();
     },
   });
@@ -47,7 +57,7 @@ function useSummary() {
     queryKey: ["summary"],
     queryFn: async () => {
       const res = await fetch("/api/orders/summary", { credentials: "include" });
-      if (!res.ok) throw new Error("Unauthorized");
+      if (!res.ok) throw new Error(`Failed to load summary (${res.status})`);
       return res.json();
     },
   });
@@ -59,34 +69,20 @@ function usePublicSummary() {
   return useQuery<OrdersSummary>({
     queryKey: ["public-summary"],
     queryFn: async () => {
-      try {
-        const res = await fetch("/api/public/summary");
-        if (!res.ok) throw new Error();
-        return res.json();
-      } catch {
-        return mockSummary;
-      }
+      const res = await fetch("/api/public/summary");
+      if (!res.ok) throw new Error();
+      return res.json();
     },
   });
-}
-
-interface ChartPoint {
-  date: string;
-  btc: number;
-  spent: number;
 }
 
 function usePublicChart() {
   return useQuery<ChartPoint[]>({
     queryKey: ["public-chart"],
     queryFn: async () => {
-      try {
-        const res = await fetch("/api/public/chart");
-        if (!res.ok) throw new Error();
-        return res.json();
-      } catch {
-        return [];
-      }
+      const res = await fetch("/api/public/chart");
+      if (!res.ok) throw new Error();
+      return res.json();
     },
   });
 }
@@ -95,26 +91,41 @@ function useHealth() {
   return useQuery<HealthStatus>({
     queryKey: ["health"],
     queryFn: async () => {
-      try {
-        const res = await fetch("/health/ready");
-        if (!res.ok) throw new Error();
-        return res.json();
-      } catch {
-        return mockHealth;
-      }
+      const res = await fetch("/health/ready");
+      if (!res.ok) throw new Error();
+      return res.json();
     },
     refetchInterval: 10_000,
   });
+}
+
+// --- Error banner ---
+
+function ErrorBanner({ message }: { message: string }) {
+  return (
+    <div className="mb-6 flex items-center gap-3 rounded-xl border border-red-loss/30 bg-red-loss/10 px-5 py-3">
+      <AlertTriangle className="h-5 w-5 shrink-0 text-red-loss" />
+      <div>
+        <p className="text-sm font-medium text-red-loss">
+          Failed to load data
+        </p>
+        <p className="text-xs text-red-loss/70">{message}</p>
+      </div>
+    </div>
+  );
 }
 
 // --- Admin Dashboard (full access) ---
 
 function AdminDashboard() {
   const { user, logout } = useAuth();
-  const { data: orders = mockOrders } = useOrders();
-  const { data: assets = mockAssets } = useAssets();
-  const { data: summary = mockSummary } = useSummary();
-  const { data: health = mockHealth } = useHealth();
+  const [page, setPage] = useState(1);
+  const { data: ordersPage, error: ordersError } = useOrders(page);
+  const { data: assets, error: assetsError } = useAssets();
+  const { data: summary, error: summaryError } = useSummary();
+  const { data: health } = useHealth();
+
+  const apiError = ordersError || assetsError || summaryError;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
@@ -134,7 +145,7 @@ function AdminDashboard() {
           <div className="hidden sm:flex items-center gap-2 rounded-lg border border-surface-700/30 bg-surface-800/40 px-3 py-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-green-gain" />
             <span className="font-mono text-xs text-surface-300">
-              {assets[0]?.pair ?? "BTCBRL"}
+              {assets?.[0]?.pair ?? "BTCBRL"}
             </span>
           </div>
           <span className="hidden sm:inline text-xs text-surface-400">
@@ -150,18 +161,31 @@ function AdminDashboard() {
         </div>
       </header>
 
-      <div className="mb-6 grid gap-6 md:grid-cols-2">
-        <StatusCard health={health} asset={assets[0]} />
-        <SpendingCard summary={summary} />
-      </div>
+      {apiError && <ErrorBanner message={apiError.message} />}
 
-      <div className="mb-6">
-        <AccumulationChart orders={orders} />
-      </div>
+      {summary && health && (
+        <div className="mb-6 grid gap-6 md:grid-cols-2">
+          <StatusCard health={health} asset={assets?.[0]} />
+          <SpendingCard summary={summary} />
+        </div>
+      )}
 
-      <div>
-        <OrdersTable orders={orders} />
-      </div>
+      {ordersPage && (
+        <>
+          <div className="mb-6">
+            <AccumulationChart orders={ordersPage.data} />
+          </div>
+          <div>
+            <OrdersTable
+              orders={ordersPage.data}
+              page={ordersPage.page}
+              totalPages={ordersPage.totalPages}
+              total={ordersPage.total}
+              onPageChange={setPage}
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -169,8 +193,9 @@ function AdminDashboard() {
 // --- Public Dashboard (read-only, limited data) ---
 
 function PublicDashboard() {
-  const { data: summary = mockSummary } = usePublicSummary();
-  const { data: health = mockHealth } = useHealth();
+  const { data: summary } = usePublicSummary();
+  const { data: chartPoints } = usePublicChart();
+  const { data: health } = useHealth();
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
@@ -205,7 +230,6 @@ function PublicDashboard() {
         </div>
       </header>
 
-      {/* Public: only summary stats, no detailed orders */}
       <div className="mb-6 grid gap-6 md:grid-cols-2">
         <div className="rounded-xl border border-surface-700/50 bg-surface-900/80 p-5 backdrop-blur-sm">
           <h2 className="mb-4 text-sm font-semibold tracking-wide uppercase text-surface-300">
@@ -213,15 +237,15 @@ function PublicDashboard() {
           </h2>
           <div className="flex items-center gap-3 mb-4">
             <div className="relative flex h-3 w-3">
-              {health.status === "ok" && (
+              {health?.status === "ok" && (
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-gain opacity-40" />
               )}
               <span
-                className={`relative inline-flex h-3 w-3 rounded-full ${health.status === "ok" ? "bg-green-gain" : "bg-red-loss"}`}
+                className={`relative inline-flex h-3 w-3 rounded-full ${health?.status === "ok" ? "bg-green-gain" : "bg-red-loss"}`}
               />
             </div>
             <span className="font-mono text-sm font-medium text-surface-100">
-              {health.status === "ok" ? "Running" : "Degraded"}
+              {health?.status === "ok" ? "Running" : health ? "Degraded" : "Unknown"}
             </span>
           </div>
           <p className="text-xs text-surface-500">
@@ -229,19 +253,25 @@ function PublicDashboard() {
           </p>
         </div>
 
-        <SpendingCard summary={summary} />
+        {summary && <SpendingCard summary={summary} />}
       </div>
 
-      {/* Locked sections */}
+      {/* Public accumulation chart */}
+      {chartPoints && chartPoints.length > 0 && (
+        <div className="mb-6">
+          <AccumulationChart points={chartPoints} />
+        </div>
+      )}
+
       <div className="mb-6 rounded-xl border border-surface-700/30 bg-surface-900/50 p-8 text-center">
         <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-surface-700/30 bg-surface-800/50">
           <LogIn className="h-5 w-5 text-surface-400" />
         </div>
         <p className="text-sm font-medium text-surface-300">
-          Sign in to view purchase history and detailed charts
+          Sign in to view purchase history
         </p>
         <p className="mt-1 text-xs text-surface-500">
-          The public view shows summary statistics only
+          Detailed order data is admin-only
         </p>
       </div>
     </div>
@@ -283,14 +313,14 @@ function PublicOrLogin() {
   return <PublicDashboard />;
 }
 
-import { useState, useEffect } from "react";
-
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <AppRouter />
-      </AuthProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <AppRouter />
+        </AuthProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }

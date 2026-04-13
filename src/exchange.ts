@@ -124,6 +124,9 @@ export async function getTickerPrice(pair: string): Promise<number> {
     });
 
     const result = handleResponse(data, "getTickerPrice");
+    if (!result.list?.[0]) {
+      throw new ExchangeClientError(`No ticker data for ${pair}`);
+    }
     const price = parseFloat(result.list[0].lastPrice);
     logger.info("Fetched ticker price", { pair, price });
     return price;
@@ -249,6 +252,9 @@ export async function getOrderDetail(
     });
 
     const result = handleResponse(data, "getOrderDetail");
+    if (!result.list?.[0]) {
+      throw new ExchangeApiError(`No order detail for ${orderId}`);
+    }
     return result.list[0];
   } catch (error) {
     if (

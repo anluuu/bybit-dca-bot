@@ -3,7 +3,9 @@ import fastifyJwt from "@fastify/jwt";
 import fastifyCookie from "@fastify/cookie";
 import fastifyCors from "@fastify/cors";
 import fastifyRateLimit from "@fastify/rate-limit";
+import fastifyCsrf from "@fastify/csrf-protection";
 import { compare, hash } from "bcryptjs";
+import { z } from "zod/v4";
 import type { Redis } from "ioredis";
 import { sql } from "drizzle-orm";
 import { desc } from "drizzle-orm";
@@ -26,6 +28,10 @@ export async function startServer(redisConnection: Redis) {
   });
 
   await app.register(fastifyCookie);
+
+  await app.register(fastifyCsrf, {
+    cookieOpts: { signed: false, httpOnly: true, sameSite: "strict" },
+  });
 
   await app.register(fastifyJwt, {
     secret: config.JWT_SECRET,
@@ -60,18 +66,21 @@ export async function startServer(redisConnection: Redis) {
 
   // --- Auth endpoints ---
 
+  const loginSchema = z.object({
+    username: z.string().min(1).max(100),
+    password: z.string().min(1).max(200),
+  });
+
   app.post(
     "/api/auth/login",
     { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } },
     async (request, reply) => {
-      const { username, password } = request.body as {
-        username: string;
-        password: string;
-      };
-
-      if (!username || !password) {
-        return reply.status(400).send({ error: "Missing credentials" });
+      const parsed = loginSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send({ error: "Invalid credentials format" });
       }
+
+      const { username, password } = parsed.data;
 
       if (
         username !== config.ADMIN_USERNAME ||
@@ -222,12 +231,37 @@ export async function startServer(redisConnection: Redis) {
 
   // --- Private API (auth required) ---
 
-  app.get("/api/orders", authPreHandler, async () => {
-    return db
-      .select()
-      .from(orders)
-      .orderBy(desc(orders.executedAt))
-      .limit(100);
+  const ordersQuerySchema = z.object({
+    page: z.coerce.number().int().min(1).default(1),
+    pageSize: z.coerce.number().int().min(1).max(100).default(25),
+  });
+
+  app.get("/api/orders", authPreHandler, async (request, reply) => {
+    const parsed = ordersQuerySchema.safeParse(request.query);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: "Invalid query params" });
+    }
+    const { page, pageSize } = parsed.data;
+
+    const [rows, count] = await Promise.all([
+      db
+        .select()
+        .from(orders)
+        .orderBy(desc(orders.executedAt))
+        .limit(pageSize)
+        .offset((page - 1) * pageSize),
+      db
+        .select({ total: sql<string>`COUNT(*)` })
+        .from(orders),
+    ]);
+
+    return {
+      data: rows,
+      page,
+      pageSize,
+      total: parseInt(count[0].total),
+      totalPages: Math.ceil(parseInt(count[0].total) / pageSize),
+    };
   });
 
   app.get("/api/orders/summary", authPreHandler, async () => {

@@ -9,20 +9,34 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { TrendingUp } from "lucide-react";
-import type { Order } from "../lib/api.ts";
+import type { Order, ChartPoint } from "../lib/api.ts";
 
 interface AccumulationChartProps {
-  orders: Order[];
+  orders?: Order[];
+  points?: ChartPoint[];
 }
 
-interface ChartPoint {
+interface DisplayPoint {
   date: string;
   btc: number;
   spent: number;
 }
 
-export function AccumulationChart({ orders }: AccumulationChartProps) {
-  const data = useMemo(() => {
+export function AccumulationChart({ orders, points }: AccumulationChartProps) {
+  const data = useMemo<DisplayPoint[]>(() => {
+    if (points) {
+      return points.map((p) => ({
+        date: new Date(p.date).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        }),
+        btc: p.btc,
+        spent: p.spent,
+      }));
+    }
+
+    if (!orders) return [];
+
     const filledOrders = orders
       .filter((o) => o.status === "filled" && o.quantity)
       .sort(
@@ -33,7 +47,7 @@ export function AccumulationChart({ orders }: AccumulationChartProps) {
     let cumulativeBtc = 0;
     let cumulativeSpent = 0;
 
-    return filledOrders.map<ChartPoint>((o) => {
+    return filledOrders.map<DisplayPoint>((o) => {
       cumulativeBtc += parseFloat(o.quantity!);
       cumulativeSpent += parseFloat(o.fiatSpent!);
       return {
@@ -45,7 +59,7 @@ export function AccumulationChart({ orders }: AccumulationChartProps) {
         spent: parseFloat(cumulativeSpent.toFixed(2)),
       };
     });
-  }, [orders]);
+  }, [orders, points]);
 
   if (data.length === 0) {
     return (
@@ -112,7 +126,7 @@ export function AccumulationChart({ orders }: AccumulationChartProps) {
 function CustomTooltip({ active, payload }: any) {
   if (!active || !payload?.length) return null;
 
-  const point = payload[0].payload as ChartPoint;
+  const point = payload[0].payload as DisplayPoint;
 
   return (
     <div className="rounded-lg border border-surface-700 bg-surface-900 px-3 py-2 shadow-xl">

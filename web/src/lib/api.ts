@@ -35,6 +35,20 @@ export interface HealthStatus {
   redis?: string;
 }
 
+export interface OrdersPage {
+  data: Order[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface ChartPoint {
+  date: string;
+  btc: number;
+  spent: number;
+}
+
 export interface OrdersSummary {
   totalOrders: number;
   totalBtc: number;

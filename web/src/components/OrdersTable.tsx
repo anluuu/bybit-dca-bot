@@ -1,9 +1,13 @@
-import { ArrowUpDown, ListOrdered } from "lucide-react";
+import { ArrowUpDown, ChevronLeft, ChevronRight, ListOrdered } from "lucide-react";
 import { useState } from "react";
 import type { Order } from "../lib/api.ts";
 
 interface OrdersTableProps {
   orders: Order[];
+  page?: number;
+  totalPages?: number;
+  total?: number;
+  onPageChange?: (page: number) => void;
 }
 
 type SortKey = "executedAt" | "fiatSpent" | "price";
@@ -37,7 +41,13 @@ function formatDate(iso: string): string {
   });
 }
 
-export function OrdersTable({ orders }: OrdersTableProps) {
+export function OrdersTable({
+  orders,
+  page,
+  totalPages,
+  total,
+  onPageChange,
+}: OrdersTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("executedAt");
   const [sortAsc, setSortAsc] = useState(false);
 
@@ -71,7 +81,7 @@ export function OrdersTable({ orders }: OrdersTableProps) {
           Purchase History
         </h2>
         <span className="ml-auto font-mono text-xs text-surface-400">
-          {orders.length} orders
+          {total !== undefined ? `${total} orders` : `${orders.length} orders`}
         </span>
       </div>
 
@@ -155,6 +165,32 @@ export function OrdersTable({ orders }: OrdersTableProps) {
           </tbody>
         </table>
       </div>
+
+      {page !== undefined && totalPages !== undefined && totalPages > 1 && onPageChange && (
+        <div className="flex items-center justify-between border-t border-surface-700/30 px-5 py-3">
+          <span className="font-mono text-xs text-surface-400">
+            Page {page} of {totalPages}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onPageChange(page - 1)}
+              disabled={page <= 1}
+              className="flex cursor-pointer items-center gap-1 rounded-md border border-surface-700/40 bg-surface-800/40 px-2.5 py-1.5 text-xs text-surface-300 transition-colors hover:border-amber-glow/40 hover:text-amber-glow disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-surface-700/40 disabled:hover:text-surface-300"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+              Prev
+            </button>
+            <button
+              onClick={() => onPageChange(page + 1)}
+              disabled={page >= totalPages}
+              className="flex cursor-pointer items-center gap-1 rounded-md border border-surface-700/40 bg-surface-800/40 px-2.5 py-1.5 text-xs text-surface-300 transition-colors hover:border-amber-glow/40 hover:text-amber-glow disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-surface-700/40 disabled:hover:text-surface-300"
+            >
+              Next
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

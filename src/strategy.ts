@@ -9,6 +9,7 @@ import {
   cancelOrder,
   getOrderDetail,
   ExchangeClientError,
+  type OrderDetail,
 } from "./exchange.js";
 import { getMonthlySpent } from "./spending.js";
 import {
@@ -21,6 +22,37 @@ import { logger } from "./logger.js";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForOrderFill(
+  pair: string,
+  orderId: string,
+  maxAttempts: number,
+  delayMs: number
+): Promise<OrderDetail> {
+  for (let i = 0; i < maxAttempts; i++) {
+    if (i > 0) await sleep(delayMs);
+    const detail = await getOrderDetail(pair, orderId);
+    if (detail.status === "Filled" || detail.status === "PartiallyFilledCanceled") {
+      return detail;
+    }
+    if (detail.status === "Cancelled" || detail.status === "Rejected") {
+      return detail;
+    }
+  }
+  return getOrderDetail(pair, orderId);
+}
+
+function recordOrderResult(detail: OrderDetail, pair: string, orderType: string) {
+  return {
+    pair,
+    orderType,
+    price: parseFloat(detail.avgPrice),
+    quantity: parseFloat(detail.cumExecQty),
+    fiatSpent: parseFloat(detail.cumExecValue),
+    fee: parseFloat(detail.cumExecFee),
+    feeCurrency: detail.feeCurrency,
+  };
 }
 
 export async function executeDca(asset: Asset): Promise<void> {
@@ -93,7 +125,6 @@ export async function executeDca(asset: Asset): Promise<void> {
   // 6. Poll for limit order fill
   const pollIntervalMs = 30_000;
   const maxPolls = Math.ceil((limitWaitMins * 60_000) / pollIntervalMs);
-  let filled = false;
 
   for (let i = 0; i < maxPolls; i++) {
     await sleep(pollIntervalMs);
@@ -101,8 +132,6 @@ export async function executeDca(asset: Asset): Promise<void> {
     const detail = await getOrderDetail(pair, limitOrderId);
 
     if (detail.status === "Filled") {
-      filled = true;
-
       await db
         .update(orders)
         .set({
@@ -115,26 +144,28 @@ export async function executeDca(asset: Asset): Promise<void> {
         })
         .where(eq(orders.id, insertedOrder.id));
 
-      await notifySuccess({
-        pair,
-        orderType: "limit",
-        price: parseFloat(detail.avgPrice),
-        quantity: parseFloat(detail.cumExecQty),
-        fiatSpent: parseFloat(detail.cumExecValue),
-        fee: parseFloat(detail.cumExecFee),
-        feeCurrency: detail.feeCurrency,
-      });
-
+      await notifySuccess(recordOrderResult(detail, pair, "limit"));
       logger.info("Limit order filled", { pair, orderId: limitOrderId });
       return;
     }
 
-    if (detail.status === "Cancelled" || detail.status === "Rejected") {
-      logger.warn("Limit order was cancelled/rejected externally", {
+    // Handle external cancellation or rejection
+    if (
+      detail.status === "Cancelled" ||
+      detail.status === "Rejected" ||
+      detail.status === "PartiallyFilledCanceled"
+    ) {
+      logger.warn("Limit order ended externally", {
         pair,
         orderId: limitOrderId,
         status: detail.status,
       });
+
+      await db
+        .update(orders)
+        .set({ status: "cancelled" })
+        .where(eq(orders.id, insertedOrder.id));
+
       break;
     }
 
@@ -146,8 +177,6 @@ export async function executeDca(asset: Asset): Promise<void> {
       status: detail.status,
     });
   }
-
-  if (filled) return;
 
   // 7. Limit order not filled — cancel and fallback to market
   logger.info("Limit order not filled, falling back to market", {
@@ -164,6 +193,7 @@ export async function executeDca(asset: Asset): Promise<void> {
     });
   }
 
+  // Update limit order row if still pending (timeout case)
   await db
     .update(orders)
     .set({ status: "cancelled" })
@@ -182,17 +212,20 @@ export async function executeDca(asset: Asset): Promise<void> {
     throw error;
   }
 
-  // Wait briefly for market order to fill
-  await sleep(5_000);
+  // 9. Poll market order with retries (not just a single sleep)
+  const marketDetail = await waitForOrderFill(pair, marketOrderId, 5, 2_000);
 
-  const marketDetail = await getOrderDetail(pair, marketOrderId);
+  const isFilled =
+    marketDetail.status === "Filled" ||
+    (marketDetail.status === "PartiallyFilledCanceled" &&
+      parseFloat(marketDetail.cumExecQty) > 0);
 
   await db.insert(orders).values({
     assetId,
     pair,
     orderType: "market",
     bybitOrderId: marketOrderId,
-    status: marketDetail.status === "Filled" ? "filled" : "failed",
+    status: isFilled ? "filled" : "failed",
     price: marketDetail.avgPrice,
     quantity: marketDetail.cumExecQty,
     fiatSpent: parseFloat(marketDetail.cumExecValue).toFixed(2),
@@ -200,16 +233,8 @@ export async function executeDca(asset: Asset): Promise<void> {
     feeCurrency: marketDetail.feeCurrency,
   });
 
-  if (marketDetail.status === "Filled") {
-    await notifySuccess({
-      pair,
-      orderType: "market",
-      price: parseFloat(marketDetail.avgPrice),
-      quantity: parseFloat(marketDetail.cumExecQty),
-      fiatSpent: parseFloat(marketDetail.cumExecValue),
-      fee: parseFloat(marketDetail.cumExecFee),
-      feeCurrency: marketDetail.feeCurrency,
-    });
+  if (isFilled) {
+    await notifySuccess(recordOrderResult(marketDetail, pair, "market"));
     logger.info("Market fallback order filled", {
       pair,
       orderId: marketOrderId,
