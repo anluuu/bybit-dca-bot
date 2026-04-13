@@ -22,8 +22,12 @@ void i18n
     supportedLngs: SUPPORTED_LOCALES,
     nonExplicitSupportedLngs: true, // map "en-US" → "en"
     interpolation: { escapeValue: false },
+    // pt-BR is the default: only honor an explicit user override in
+    // localStorage. Navigator language is intentionally ignored — a Brazilian
+    // viewing the site from a browser set to en-US should still see
+    // Portuguese unless they click the switcher.
     detection: {
-      order: ["localStorage", "navigator", "htmlTag"],
+      order: ["localStorage", "htmlTag"],
       caches: ["localStorage"],
       lookupLocalStorage: "dca.locale",
     },
