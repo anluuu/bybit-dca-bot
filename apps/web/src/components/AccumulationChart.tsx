@@ -8,8 +8,9 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { TrendingUp } from "lucide-react";
+import { TrendingUp, Bitcoin, Clock } from "lucide-react";
 import type { Order, ChartPoint } from "../lib/api.ts";
+import { nextSundayLabel } from "../lib/nextBuy.ts";
 
 interface AccumulationChartProps {
   orders?: Order[];
@@ -63,8 +64,55 @@ export function AccumulationChart({ orders, points }: AccumulationChartProps) {
 
   if (data.length === 0) {
     return (
-      <div className="flex h-64 items-center justify-center rounded-xl border border-surface-700/50 bg-surface-900/80 p-5">
-        <p className="text-sm text-surface-400">No filled orders yet</p>
+      <div className="rounded-xl border border-surface-700/50 bg-surface-900/80 p-5 backdrop-blur-sm">
+        <div className="mb-4 flex items-center gap-2">
+          <TrendingUp className="h-4 w-4 text-amber-glow" />
+          <h2 className="text-sm font-semibold tracking-wide uppercase text-surface-300">
+            BTC Accumulation
+          </h2>
+          <span className="ml-auto font-mono text-xs text-surface-500">
+            waiting for first fill
+          </span>
+        </div>
+        <div className="relative flex h-56 flex-col items-center justify-center gap-3 overflow-hidden rounded-lg border border-dashed border-surface-700/40">
+          {/* Subtle ghost baseline so the rectangle doesn't feel empty */}
+          <svg
+            className="absolute inset-x-0 bottom-0 h-full w-full opacity-30"
+            preserveAspectRatio="none"
+            viewBox="0 0 100 40"
+          >
+            <defs>
+              <linearGradient id="ghostGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.15} />
+                <stop offset="100%" stopColor="#f59e0b" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <path
+              d="M0 38 L15 34 L30 30 L45 25 L60 18 L75 12 L100 4 L100 40 L0 40 Z"
+              fill="url(#ghostGrad)"
+            />
+            <path
+              d="M0 38 L15 34 L30 30 L45 25 L60 18 L75 12 L100 4"
+              fill="none"
+              stroke="#f59e0b"
+              strokeOpacity={0.35}
+              strokeWidth={0.6}
+              strokeDasharray="1.5 1.5"
+            />
+          </svg>
+          <div className="relative z-10 flex h-12 w-12 items-center justify-center rounded-full border border-amber-glow/20 bg-surface-900/80">
+            <Bitcoin className="h-5 w-5 text-amber-glow" />
+          </div>
+          <div className="relative z-10 text-center">
+            <p className="text-sm font-medium text-surface-200">
+              Your stack starts here
+            </p>
+            <p className="mt-1 flex items-center justify-center gap-1.5 font-mono text-xs text-surface-400">
+              <Clock className="h-3 w-3" />
+              First buy {nextSundayLabel()}
+            </p>
+          </div>
+        </div>
       </div>
     );
   }

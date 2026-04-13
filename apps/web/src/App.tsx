@@ -311,19 +311,19 @@ function PublicDashboard() {
         </div>
       )}
 
-      {chartPoints && chartPoints.length > 0 && (
+      {chartPoints && (
         <div className="mb-6">
           <AccumulationChart points={chartPoints} />
         </div>
       )}
 
-      {monthly && monthly.length > 0 && (
+      {monthly && (
         <div className="mb-6">
           <MonthlyOverview data={monthly} variant="admin" />
         </div>
       )}
 
-      {ordersPage && ordersPage.data.length > 0 && (
+      {ordersPage && (
         <div className="mb-6">
           <OrdersTable
             orders={ordersPage.data}

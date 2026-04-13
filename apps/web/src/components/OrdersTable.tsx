@@ -1,6 +1,14 @@
-import { ArrowUpDown, ChevronLeft, ChevronRight, ListOrdered } from "lucide-react";
+import {
+  ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  ListOrdered,
+  PackageOpen,
+} from "lucide-react";
 import { useState } from "react";
 import type { Order, PublicOrder } from "../lib/api.ts";
+import { nextSundayLabel } from "../lib/nextBuy.ts";
 
 /**
  * Display shape shared by admin `Order` and sanitized `PublicOrder`.
@@ -71,6 +79,49 @@ export function OrdersTable({
   const [sortAsc, setSortAsc] = useState(false);
 
   const rows: OrderRow[] = orders as unknown as OrderRow[];
+
+  if (rows.length === 0) {
+    return (
+      <div className="rounded-xl border border-surface-700/50 bg-surface-900/80 backdrop-blur-sm">
+        <div className="flex items-center gap-2 border-b border-surface-700/30 px-5 py-4">
+          <ListOrdered className="h-4 w-4 text-amber-glow" />
+          <h2 className="text-sm font-semibold tracking-wide uppercase text-surface-300">
+            Purchase History
+          </h2>
+          <span className="ml-auto font-mono text-xs text-surface-400">
+            0 orders
+          </span>
+        </div>
+        <div className="flex flex-col items-center justify-center gap-3 px-6 py-14">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full border border-amber-glow/20 bg-amber-glow/5">
+            <PackageOpen className="h-5 w-5 text-amber-glow" />
+          </div>
+          <div className="text-center">
+            <p className="text-sm font-medium text-surface-200">
+              Waiting for the first fill
+            </p>
+            <p className="mt-1 flex items-center justify-center gap-1.5 font-mono text-xs text-surface-400">
+              <Clock className="h-3 w-3" />
+              {nextSundayLabel()}
+            </p>
+          </div>
+          {/* Skeleton rows — hint at the table that will live here */}
+          <div className="mt-3 w-full max-w-md space-y-2 opacity-40">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="flex items-center gap-3 rounded-md border border-surface-700/30 bg-surface-800/20 px-3 py-2"
+              >
+                <div className="h-2 w-20 rounded bg-surface-700/40" />
+                <div className="h-2 w-16 rounded bg-surface-700/40" />
+                <div className="ml-auto h-2 w-14 rounded bg-amber-glow/20" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const sorted = [...rows].sort((a, b) => {
     let cmp = 0;
