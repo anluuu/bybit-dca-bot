@@ -1,0 +1,65 @@
+services:
+  bot:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "${PORT:-3000}:${PORT:-3000}"
+    environment:
+      DATABASE_URL: postgres://dca:${POSTGRES_PASSWORD}@postgres:5432/dca_bot
+      REDIS_URL: redis://redis:6379
+      BYBIT_API_KEY: ${BYBIT_API_KEY}
+      BYBIT_API_SECRET: ${BYBIT_API_SECRET}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
+      BUY_AMOUNT_BRL: ${BUY_AMOUNT_BRL:-250}
+      MONTHLY_CAP_BRL: ${MONTHLY_CAP_BRL:-1000}
+      CRON_SCHEDULE: ${CRON_SCHEDULE:-0 8 * * 0}
+      LIMIT_DISCOUNT_PCT: ${LIMIT_DISCOUNT_PCT:-0.3}
+      LIMIT_WAIT_MINUTES: ${LIMIT_WAIT_MINUTES:-120}
+      TRADING_PAIR: ${TRADING_PAIR:-BTCBRL}
+      PORT: ${PORT:-3000}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:${PORT:-3000}/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dca
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: dca_bot
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dca -d dca_bot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+  redisdata:
