@@ -82,13 +82,14 @@ export function formatDateShort(iso: string | Date): string {
   }).format(d);
 }
 
-/** "dom., 14 de abr., 08:00 UTC" — used for the "next buy" label. */
+/** "domingo, 19 de abril de 2026, 08:00 UTC" — used for the "next buy" label. */
 export function formatNextBuy(iso: string | Date): string {
   const d = typeof iso === "string" ? new Date(iso) : iso;
   return (
     new Intl.DateTimeFormat(currentLocale(), {
-      weekday: "short",
-      month: "short",
+      weekday: "long",
+      year: "numeric",
+      month: "long",
       day: "numeric",
       hour: "2-digit",
       minute: "2-digit",
