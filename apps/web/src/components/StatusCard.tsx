@@ -6,7 +6,9 @@ import {
   Database,
   Server,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { HealthStatus, Asset, PublicStatus } from "../lib/api.ts";
+import { formatCurrencyCompact, formatNextBuy } from "../lib/format.ts";
 
 function formatUptime(seconds: number): string {
   const d = Math.floor(seconds / 86400);
@@ -24,14 +26,7 @@ function getNextSunday(): string {
   next.setUTCDate(now.getUTCDate() + daysUntilSunday);
   next.setUTCHours(8, 0, 0, 0);
   if (next <= now) next.setUTCDate(next.getUTCDate() + 7);
-  return next.toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "UTC",
-  }) + " UTC";
+  return formatNextBuy(next);
 }
 
 interface StatusCardProps {
@@ -44,6 +39,7 @@ interface StatusCardProps {
 }
 
 export function StatusCard({ health, asset }: StatusCardProps) {
+  const { t } = useTranslation();
   const isHealthy = health.status === "ok";
 
   return (
@@ -51,7 +47,7 @@ export function StatusCard({ health, asset }: StatusCardProps) {
       <div className="mb-4 flex items-center gap-2">
         <Activity className="h-4 w-4 text-amber-glow" />
         <h2 className="text-sm font-semibold tracking-wide uppercase text-surface-300">
-          Bot Status
+          {t("status.botStatus")}
         </h2>
       </div>
 
@@ -66,10 +62,10 @@ export function StatusCard({ health, asset }: StatusCardProps) {
           />
         </div>
         <span className="font-mono text-sm font-medium text-surface-100">
-          {isHealthy ? "Running" : "Degraded"}
+          {isHealthy ? t("status.running") : t("status.degraded")}
         </span>
         <span className="ml-auto font-mono text-xs text-surface-400">
-          uptime {formatUptime(health.uptime)}
+          {t("status.uptime")} {formatUptime(health.uptime)}
         </span>
       </div>
 
@@ -77,12 +73,12 @@ export function StatusCard({ health, asset }: StatusCardProps) {
       <div className="mb-5 space-y-2">
         <ServiceRow
           icon={<Database className="h-3.5 w-3.5" />}
-          label="PostgreSQL"
+          label={t("status.postgres")}
           status={health.postgres ?? "unknown"}
         />
         <ServiceRow
           icon={<Server className="h-3.5 w-3.5" />}
-          label="Redis"
+          label={t("status.redis")}
           status={health.redis ?? "unknown"}
         />
       </div>
@@ -91,14 +87,17 @@ export function StatusCard({ health, asset }: StatusCardProps) {
       <div className="rounded-lg border border-surface-700/30 bg-surface-800/50 p-3">
         <div className="flex items-center gap-2 text-xs text-surface-400">
           <Clock className="h-3.5 w-3.5" />
-          <span>Next scheduled buy</span>
+          <span>{t("status.nextScheduledBuy")}</span>
         </div>
         <p className="mt-1 font-mono text-sm font-medium text-amber-glow">
           {getNextSunday()}
         </p>
         {asset && (
           <p className="mt-0.5 font-mono text-xs text-surface-400">
-            ~R${parseFloat(asset.buyAmount).toFixed(0)} of {asset.pair}
+            {t("status.ofPair", {
+              amount: formatCurrencyCompact(parseFloat(asset.buyAmount)),
+              pair: asset.pair,
+            })}
           </p>
         )}
       </div>
@@ -115,7 +114,12 @@ function ServiceRow({
   label: string;
   status: string;
 }) {
+  const { t } = useTranslation();
   const ok = status === "connected";
+  // i18next returns the key if missing; `returnNull: false` is set in config.
+  const translatedStatus = t(`status.serviceStatus.${status}`, {
+    defaultValue: status,
+  });
   return (
     <div className="flex items-center gap-2 text-sm">
       <span className="text-surface-400">{icon}</span>
@@ -129,7 +133,7 @@ function ServiceRow({
         <span
           className={`font-mono text-xs ${ok ? "text-green-gain" : "text-red-loss"}`}
         >
-          {status}
+          {translatedStatus}
         </span>
       </span>
     </div>

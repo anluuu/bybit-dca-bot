@@ -1,3 +1,5 @@
+import { formatNextBuy } from "./format.ts";
+
 /**
  * "Next Sunday at 08:00 UTC" label used by empty states across the dashboard.
  * Mirrors the logic in StatusCard's `getNextSunday` — kept here so empty
@@ -13,14 +15,5 @@ export function nextSundayLabel(): string {
   next.setUTCDate(now.getUTCDate() + daysUntilSunday);
   next.setUTCHours(8, 0, 0, 0);
   if (next <= now) next.setUTCDate(next.getUTCDate() + 7);
-  return (
-    next.toLocaleDateString("en-US", {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      timeZone: "UTC",
-    }) + " UTC"
-  );
+  return formatNextBuy(next);
 }

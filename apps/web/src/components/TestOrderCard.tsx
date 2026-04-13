@@ -11,7 +11,14 @@ import {
   ShieldAlert,
   X,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { TestOrderPreview, TestOrderResult } from "../lib/api.ts";
+import {
+  formatBtc,
+  formatCurrency,
+  formatCurrencyCompact,
+  formatPercent,
+} from "../lib/format.ts";
 
 interface TestOrderCardProps {
   pair: string;
@@ -32,6 +39,7 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
 }
 
 export function TestOrderCard({ pair }: TestOrderCardProps) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [typedPair, setTypedPair] = useState("");
@@ -64,16 +72,15 @@ export function TestOrderCard({ pair }: TestOrderCardProps) {
       <div className="mb-4 flex items-center gap-2">
         <FlaskConical className="h-4 w-4 text-violet-tech" />
         <h2 className="text-sm font-semibold tracking-wide uppercase text-surface-300">
-          Test Order
+          {t("test.testOrder")}
         </h2>
         <span className="ml-auto rounded-md border border-violet-tech/20 bg-violet-tech/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-violet-tech">
-          operator only
+          {t("test.operatorOnly")}
         </span>
       </div>
 
       <p className="mb-4 text-xs leading-relaxed text-surface-400">
-        Places a small real market order to verify Bybit credentials, price
-        math, and order flow. Excluded from monthly cap and dashboard totals.
+        {t("test.description")}
       </p>
 
       {/* Preview panel */}
@@ -83,14 +90,14 @@ export function TestOrderCard({ pair }: TestOrderCardProps) {
           className="group flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-surface-700/40 bg-surface-800/40 px-4 py-2.5 text-sm font-medium text-surface-200 transition-all hover:border-amber-glow/40 hover:bg-surface-800/80 hover:text-amber-glow"
         >
           <Activity className="h-4 w-4" />
-          Generate preview
+          {t("test.generatePreview")}
         </button>
       )}
 
       {preview.isPending && (
         <div className="flex w-full items-center justify-center gap-2 rounded-lg border border-surface-700/40 bg-surface-800/40 px-4 py-2.5 text-sm text-surface-300">
           <Loader2 className="h-4 w-4 animate-spin" />
-          Fetching ticker…
+          {t("test.fetchingTicker")}
         </div>
       )}
 
@@ -106,19 +113,17 @@ export function TestOrderCard({ pair }: TestOrderCardProps) {
           {/* Numbers grid */}
           <div className="grid grid-cols-3 gap-3 rounded-lg border border-surface-700/30 bg-surface-800/40 p-4">
             <PreviewStat
-              label="Ticker Now"
-              value={`R$${previewData.currentPrice.toLocaleString("pt-BR", {
-                maximumFractionDigits: 0,
-              })}`}
+              label={t("test.tickerNow")}
+              value={formatCurrencyCompact(previewData.currentPrice)}
             />
             <PreviewStat
-              label="Test Amount"
-              value={`R$${previewData.testAmountBrl.toFixed(2)}`}
+              label={t("test.testAmount")}
+              value={formatCurrency(previewData.testAmountBrl)}
               accent
             />
             <PreviewStat
-              label="Est. BTC"
-              value={previewData.estimatedQty.toFixed(8)}
+              label={t("test.estBtc")}
+              value={formatBtc(previewData.estimatedQty)}
               accent
             />
           </div>
@@ -129,7 +134,7 @@ export function TestOrderCard({ pair }: TestOrderCardProps) {
               <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-glow" />
               <div>
                 <p className="text-xs font-medium text-amber-glow">
-                  Execution blocked
+                  {t("test.executionBlocked")}
                 </p>
                 <p className="mt-0.5 text-xs text-amber-glow/70">
                   {previewData.busyReason}
@@ -143,7 +148,7 @@ export function TestOrderCard({ pair }: TestOrderCardProps) {
                 disabled={preview.isPending}
                 className="cursor-pointer rounded-md px-3 py-1.5 font-mono text-xs text-surface-400 transition-colors hover:text-surface-200 disabled:cursor-wait"
               >
-                Refresh preview
+                {t("test.refreshPreview")}
               </button>
               <button
                 onClick={() => setConfirmOpen(true)}
@@ -151,7 +156,7 @@ export function TestOrderCard({ pair }: TestOrderCardProps) {
                 className="flex cursor-pointer items-center gap-2 rounded-lg border border-red-loss/30 bg-red-loss/10 px-4 py-2 text-sm font-medium text-red-loss transition-all hover:border-red-loss/50 hover:bg-red-loss/20 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Play className="h-3.5 w-3.5 fill-current" />
-                Execute real test order
+                {t("test.executeReal")}
               </button>
             </div>
           )}
@@ -166,14 +171,18 @@ export function TestOrderCard({ pair }: TestOrderCardProps) {
               <>
                 <CircleCheck className="h-4 w-4 text-green-gain" />
                 <span className="text-sm font-medium text-green-gain">
-                  Test order filled
+                  {t("test.filled")}
                 </span>
               </>
             ) : (
               <>
                 <CircleX className="h-4 w-4 text-red-loss" />
                 <span className="text-sm font-medium text-red-loss">
-                  Test order {result.status}
+                  {t("test.otherStatus", {
+                    status: t(`orderStatus.${result.status}`, {
+                      defaultValue: result.status,
+                    }),
+                  })}
                 </span>
               </>
             )}
@@ -184,29 +193,31 @@ export function TestOrderCard({ pair }: TestOrderCardProps) {
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <ResultStat
-              label="Filled Price"
+              label={t("test.filledPrice")}
               value={
                 result.price
-                  ? `R$${parseFloat(result.price).toLocaleString("pt-BR", {
-                      maximumFractionDigits: 0,
-                    })}`
+                  ? formatCurrencyCompact(parseFloat(result.price))
                   : "—"
               }
             />
             <ResultStat
-              label="BTC"
-              value={result.quantity ? parseFloat(result.quantity).toFixed(8) : "—"}
+              label={t("test.btc")}
+              value={result.quantity ? formatBtc(parseFloat(result.quantity)) : "—"}
               accent
             />
             <ResultStat
-              label="Spent"
-              value={result.fiatSpent ? `R$${parseFloat(result.fiatSpent).toFixed(2)}` : "—"}
+              label={t("test.spent")}
+              value={
+                result.fiatSpent
+                  ? formatCurrency(parseFloat(result.fiatSpent))
+                  : "—"
+              }
             />
             <ResultStat
-              label="Fee"
+              label={t("test.fee")}
               value={
                 result.fee
-                  ? `${parseFloat(result.fee).toFixed(8)} ${result.feeCurrency ?? ""}`.trim()
+                  ? `${formatBtc(parseFloat(result.fee))} ${result.feeCurrency ?? ""}`.trim()
                   : "—"
               }
             />
@@ -215,7 +226,7 @@ export function TestOrderCard({ pair }: TestOrderCardProps) {
           {result.status === "filled" && slippagePct !== null && (
             <div className="mt-3 flex items-center justify-between border-t border-surface-700/30 pt-3">
               <span className="text-xs text-surface-400">
-                Slippage vs preview
+                {t("test.slippageLabel")}
               </span>
               <span
                 className={`font-mono text-xs tabular-nums ${
@@ -227,7 +238,7 @@ export function TestOrderCard({ pair }: TestOrderCardProps) {
                 }`}
               >
                 {slippagePct >= 0 ? "+" : ""}
-                {slippagePct.toFixed(3)}%
+                {formatPercent(slippagePct, 3)}%
               </span>
             </div>
           )}
@@ -235,7 +246,7 @@ export function TestOrderCard({ pair }: TestOrderCardProps) {
           {result.status !== "filled" && result.errorMessage && (
             <div className="mt-3 border-t border-surface-700/30 pt-3">
               <p className="text-[10px] uppercase tracking-wider text-surface-500">
-                Error from Bybit
+                {t("test.errorFromBybit")}
               </p>
               <p className="mt-1 break-words font-mono text-xs leading-relaxed text-red-loss">
                 {result.errorMessage}
@@ -250,7 +261,7 @@ export function TestOrderCard({ pair }: TestOrderCardProps) {
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-loss" />
           <div>
             <p className="text-xs font-medium text-red-loss">
-              Execution failed
+              {t("test.executionFailed")}
             </p>
             <p className="mt-0.5 text-xs text-red-loss/70">
               {execute.error.message}
@@ -345,6 +356,7 @@ function ConfirmModal({
   onConfirm: () => void;
   isPending: boolean;
 }) {
+  const { t } = useTranslation();
   const unlocked = typedPair.trim().toUpperCase() === pair.toUpperCase();
 
   return (
@@ -363,24 +375,19 @@ function ConfirmModal({
             <AlertTriangle className="h-4 w-4 text-red-loss" />
           </div>
           <h3 className="text-base font-semibold text-surface-100">
-            Confirm real test order
+            {t("test.confirmTitle")}
           </h3>
         </div>
 
         <p className="mb-4 text-sm leading-relaxed text-surface-300">
-          This will place a real market buy on Bybit for{" "}
-          <span className="font-mono font-medium text-amber-glow">
-            R${amount.toFixed(2)}
-          </span>{" "}
-          of{" "}
-          <span className="font-mono font-medium text-surface-100">{pair}</span>.
-          The trade will incur fees and the BTC will remain in your Bybit spot
-          wallet.
+          {t("test.confirmBody", {
+            amount: formatCurrency(amount),
+            pair,
+          })}
         </p>
 
         <label className="mb-2 block text-xs uppercase tracking-wider text-surface-400">
-          Type <span className="font-mono text-surface-200">{pair}</span> to
-          confirm
+          {t("test.typePairToConfirm", { pair })}
         </label>
         <input
           type="text"
@@ -400,7 +407,7 @@ function ConfirmModal({
             disabled={isPending}
             className="cursor-pointer rounded-md border border-surface-700/40 bg-surface-800/40 px-4 py-2 text-sm text-surface-300 transition-colors hover:border-surface-500/40 hover:text-surface-100 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Cancel
+            {t("test.cancel")}
           </button>
           <button
             onClick={onConfirm}
@@ -410,12 +417,12 @@ function ConfirmModal({
             {isPending ? (
               <>
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Placing…
+                {t("test.placing")}
               </>
             ) : (
               <>
                 <Play className="h-3.5 w-3.5 fill-current" />
-                Place real order
+                {t("test.placeOrder")}
               </>
             )}
           </button>

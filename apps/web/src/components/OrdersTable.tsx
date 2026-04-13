@@ -7,8 +7,15 @@ import {
   PackageOpen,
 } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { Order, PublicOrder } from "../lib/api.ts";
 import { nextSundayLabel } from "../lib/nextBuy.ts";
+import {
+  formatBtc,
+  formatCurrency,
+  formatCurrencyCompact,
+  formatDateTime,
+} from "../lib/format.ts";
 
 /**
  * Display shape shared by admin `Order` and sanitized `PublicOrder`.
@@ -39,7 +46,8 @@ interface OrdersTableProps {
 
 type SortKey = "executedAt" | "fiatSpent" | "price";
 
-function statusBadge(status: string) {
+function StatusBadge({ status }: { status: string }) {
+  const { t } = useTranslation();
   const styles: Record<string, string> = {
     filled: "bg-green-gain/10 text-green-gain border-green-gain/20",
     failed: "bg-red-loss/10 text-red-loss border-red-loss/20",
@@ -52,20 +60,9 @@ function statusBadge(status: string) {
     <span
       className={`inline-flex rounded-md border px-2 py-0.5 font-mono text-xs ${styles[status] ?? styles.cancelled}`}
     >
-      {status.replace("_", " ")}
+      {t(`orderStatus.${status}`, { defaultValue: status.replace("_", " ") })}
     </span>
   );
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "UTC",
-  });
 }
 
 export function OrdersTable({
@@ -75,6 +72,7 @@ export function OrdersTable({
   total,
   onPageChange,
 }: OrdersTableProps) {
+  const { t } = useTranslation();
   const [sortKey, setSortKey] = useState<SortKey>("executedAt");
   const [sortAsc, setSortAsc] = useState(false);
 
@@ -86,10 +84,10 @@ export function OrdersTable({
         <div className="flex items-center gap-2 border-b border-surface-700/30 px-5 py-4">
           <ListOrdered className="h-4 w-4 text-amber-glow" />
           <h2 className="text-sm font-semibold tracking-wide uppercase text-surface-300">
-            Purchase History
+            {t("orders.purchaseHistory")}
           </h2>
           <span className="ml-auto font-mono text-xs text-surface-400">
-            0 orders
+            {t("orders.count", { count: 0 })}
           </span>
         </div>
         <div className="flex flex-col items-center justify-center gap-3 px-6 py-14">
@@ -98,7 +96,7 @@ export function OrdersTable({
           </div>
           <div className="text-center">
             <p className="text-sm font-medium text-surface-200">
-              Waiting for the first fill
+              {t("orders.empty.title")}
             </p>
             <p className="mt-1 flex items-center justify-center gap-1.5 font-mono text-xs text-surface-400">
               <Clock className="h-3 w-3" />
@@ -150,10 +148,10 @@ export function OrdersTable({
       <div className="flex items-center gap-2 border-b border-surface-700/30 px-5 py-4">
         <ListOrdered className="h-4 w-4 text-amber-glow" />
         <h2 className="text-sm font-semibold tracking-wide uppercase text-surface-300">
-          Purchase History
+          {t("orders.purchaseHistory")}
         </h2>
         <span className="ml-auto font-mono text-xs text-surface-400">
-          {total !== undefined ? `${total} orders` : `${rows.length} orders`}
+          {t("orders.count", { count: total ?? rows.length })}
         </span>
       </div>
 
@@ -163,33 +161,33 @@ export function OrdersTable({
             <tr className="border-b border-surface-700/20 text-xs uppercase tracking-wider text-surface-400">
               <th className="px-5 py-3">
                 <SortButton
-                  label="Date"
+                  label={t("orders.columns.date")}
                   active={sortKey === "executedAt"}
                   asc={sortAsc}
                   onClick={() => toggleSort("executedAt")}
                 />
               </th>
-              <th className="px-3 py-3">Pair</th>
-              <th className="px-3 py-3">Type</th>
+              <th className="px-3 py-3">{t("orders.columns.pair")}</th>
+              <th className="px-3 py-3">{t("orders.columns.type")}</th>
               <th className="px-3 py-3">
                 <SortButton
-                  label="Price"
+                  label={t("orders.columns.price")}
                   active={sortKey === "price"}
                   asc={sortAsc}
                   onClick={() => toggleSort("price")}
                 />
               </th>
-              <th className="px-3 py-3">BTC Amount</th>
+              <th className="px-3 py-3">{t("orders.columns.btcAmount")}</th>
               <th className="px-3 py-3">
                 <SortButton
-                  label="Spent"
+                  label={t("orders.columns.spent")}
                   active={sortKey === "fiatSpent"}
                   asc={sortAsc}
                   onClick={() => toggleSort("fiatSpent")}
                 />
               </th>
-              <th className="px-3 py-3">Fee</th>
-              <th className="px-3 py-3">Status</th>
+              <th className="px-3 py-3">{t("orders.columns.fee")}</th>
+              <th className="px-3 py-3">{t("orders.columns.status")}</th>
             </tr>
           </thead>
           <tbody>
@@ -199,14 +197,14 @@ export function OrdersTable({
                 className="border-b border-surface-700/10 transition-colors hover:bg-surface-800/40"
               >
                 <td className="px-5 py-3 font-mono text-xs text-surface-200">
-                  {formatDate(order.executedAt)}
+                  {formatDateTime(order.executedAt)}
                 </td>
                 <td className="px-3 py-3 font-mono text-xs font-medium text-surface-100">
                   <span className="inline-flex items-center gap-1.5">
                     {order.pair}
                     {order.isTest && (
                       <span className="rounded border border-violet-tech/30 bg-violet-tech/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-violet-tech">
-                        test
+                        {t("orders.testBadge")}
                       </span>
                     )}
                   </span>
@@ -215,32 +213,36 @@ export function OrdersTable({
                   <span
                     className={`font-mono text-xs ${order.orderType === "limit" ? "text-violet-tech" : "text-amber-glow"}`}
                   >
-                    {order.orderType}
+                    {t(`orderType.${order.orderType}`, {
+                      defaultValue: order.orderType,
+                    })}
                   </span>
                 </td>
                 <td className="px-3 py-3 font-mono text-xs tabular-nums text-surface-200">
                   {order.price
-                    ? `R$${parseFloat(order.price).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}`
+                    ? formatCurrencyCompact(parseFloat(order.price))
                     : "—"}
                 </td>
                 <td className="px-3 py-3 font-mono text-xs tabular-nums text-amber-glow">
                   {order.quantity
-                    ? parseFloat(order.quantity).toFixed(8)
+                    ? formatBtc(parseFloat(order.quantity))
                     : "—"}
                 </td>
                 <td className="px-3 py-3 font-mono text-xs tabular-nums text-surface-200">
                   {order.fiatSpent
-                    ? `R$${parseFloat(order.fiatSpent).toFixed(2)}`
+                    ? formatCurrency(parseFloat(order.fiatSpent))
                     : "—"}
                 </td>
                 <td className="px-3 py-3 font-mono text-xs tabular-nums text-surface-400">
                   {order.fee
                     ? order.feeCurrency
-                      ? `${parseFloat(order.fee).toFixed(8)} ${order.feeCurrency}`
-                      : parseFloat(order.fee).toFixed(8)
+                      ? `${formatBtc(parseFloat(order.fee))} ${order.feeCurrency}`
+                      : formatBtc(parseFloat(order.fee))
                     : "—"}
                 </td>
-                <td className="px-3 py-3">{statusBadge(order.status)}</td>
+                <td className="px-3 py-3">
+                  <StatusBadge status={order.status} />
+                </td>
               </tr>
             ))}
           </tbody>
@@ -250,7 +252,7 @@ export function OrdersTable({
       {page !== undefined && totalPages !== undefined && totalPages > 1 && onPageChange && (
         <div className="flex items-center justify-between border-t border-surface-700/30 px-5 py-3">
           <span className="font-mono text-xs text-surface-400">
-            Page {page} of {totalPages}
+            {t("orders.pageOf", { page, total: totalPages })}
           </span>
           <div className="flex items-center gap-2">
             <button
@@ -259,14 +261,14 @@ export function OrdersTable({
               className="flex cursor-pointer items-center gap-1 rounded-md border border-surface-700/40 bg-surface-800/40 px-2.5 py-1.5 text-xs text-surface-300 transition-colors hover:border-amber-glow/40 hover:text-amber-glow disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-surface-700/40 disabled:hover:text-surface-300"
             >
               <ChevronLeft className="h-3.5 w-3.5" />
-              Prev
+              {t("orders.prev")}
             </button>
             <button
               onClick={() => onPageChange(page + 1)}
               disabled={page >= totalPages}
               className="flex cursor-pointer items-center gap-1 rounded-md border border-surface-700/40 bg-surface-800/40 px-2.5 py-1.5 text-xs text-surface-300 transition-colors hover:border-amber-glow/40 hover:text-amber-glow disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-surface-700/40 disabled:hover:text-surface-300"
             >
-              Next
+              {t("orders.next")}
               <ChevronRight className="h-3.5 w-3.5" />
             </button>
           </div>

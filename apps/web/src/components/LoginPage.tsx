@@ -1,8 +1,10 @@
 import { useState, type FormEvent } from "react";
 import { Bitcoin, LogIn, AlertCircle } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../lib/auth.tsx";
 
 export function LoginPage() {
+  const { t } = useTranslation();
   const { login } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -17,7 +19,7 @@ export function LoginPage() {
     try {
       await login(username, password);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      setError(err instanceof Error ? err.message : t("login.failed"));
     } finally {
       setLoading(false);
     }
@@ -32,9 +34,9 @@ export function LoginPage() {
             <Bitcoin className="h-7 w-7 text-amber-glow" />
           </div>
           <div className="text-center">
-            <h1 className="text-xl font-bold text-surface-100">DCA Bot</h1>
+            <h1 className="text-xl font-bold text-surface-100">{t("app.title")}</h1>
             <p className="mt-1 text-sm text-surface-400">
-              Sign in to access the dashboard
+              {t("login.subtitle")}
             </p>
           </div>
         </div>
@@ -56,7 +58,7 @@ export function LoginPage() {
               htmlFor="username"
               className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-surface-400"
             >
-              Username
+              {t("login.username")}
             </label>
             <input
               id="username"
@@ -66,7 +68,7 @@ export function LoginPage() {
               required
               autoComplete="username"
               className="w-full rounded-lg border border-surface-700/50 bg-surface-800/80 px-3 py-2.5 font-mono text-sm text-surface-100 placeholder-surface-500 outline-none transition-colors focus:border-amber-glow/50 focus:ring-1 focus:ring-amber-glow/20"
-              placeholder="admin"
+              placeholder={t("login.usernamePlaceholder")}
             />
           </div>
 
@@ -75,7 +77,7 @@ export function LoginPage() {
               htmlFor="password"
               className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-surface-400"
             >
-              Password
+              {t("login.password")}
             </label>
             <input
               id="password"
@@ -99,12 +101,12 @@ export function LoginPage() {
             ) : (
               <LogIn className="h-4 w-4" />
             )}
-            {loading ? "Signing in..." : "Sign in"}
+            {loading ? t("login.signingIn") : t("login.signIn")}
           </button>
         </form>
 
         <p className="mt-4 text-center text-xs text-surface-500">
-          Public dashboard available without login
+          {t("login.publicAvailable")}
         </p>
       </div>
     </div>

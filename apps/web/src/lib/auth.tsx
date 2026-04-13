@@ -6,6 +6,7 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
+import { i18n } from "./i18n.ts";
 
 interface User {
   username: string;
@@ -46,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      throw new Error(data.error || "Login failed");
+      throw new Error(data.error || i18n.t("login.failed"));
     }
 
     const data = await res.json();

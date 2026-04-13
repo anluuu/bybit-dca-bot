@@ -17,10 +17,17 @@ import {
   Minus,
   Info,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type {
   MonthlyBreakdown,
   PublicMonthlyBreakdown,
 } from "../lib/api.ts";
+import {
+  formatBtc,
+  formatCurrency,
+  formatCurrencyCompact,
+  formatPercent,
+} from "../lib/format.ts";
 
 type Variant = "admin" | "public";
 type WindowOption = 6 | 12 | 0; // 0 = all
@@ -38,6 +45,7 @@ export function MonthlyOverview({
   data,
   variant = "admin",
 }: MonthlyOverviewProps) {
+  const { t } = useTranslation();
   const [windowMonths, setWindowMonths] = useState<WindowOption>(6);
 
   const windowed = useMemo(() => {
@@ -61,29 +69,34 @@ export function MonthlyOverview({
       <div className="rounded-xl border border-surface-700/50 bg-surface-900/80 p-5 backdrop-blur-sm">
         <Header />
         <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-surface-700/40 text-sm text-surface-400">
-          No filled orders yet — monthly breakdown unlocks after your first buy
+          {t("monthly.noFilledYet")}
         </div>
       </div>
     );
   }
 
   const onlyOneMonth = data.length < 2;
+  const windowLabel = (w: WindowOption) =>
+    w === 0
+      ? t("monthly.window.all")
+      : w === 6
+        ? t("monthly.window.sixMonths")
+        : t("monthly.window.twelveMonths");
 
   return (
     <div className="rounded-xl border border-surface-700/50 bg-surface-900/80 p-5 backdrop-blur-sm">
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <CalendarRange className="h-4 w-4 text-amber-glow" />
         <h2 className="text-sm font-semibold tracking-wide uppercase text-surface-300">
-          Monthly Overview
+          {t("monthly.monthlyOverview")}
         </h2>
         <span className="text-xs text-surface-500">
-          volume-weighted cost basis
+          {t("monthly.costBasisSubtitle")}
         </span>
         {!onlyOneMonth && (
           <div className="ml-auto flex items-center gap-1 rounded-lg border border-surface-700/30 bg-surface-800/40 p-0.5">
             {([6, 12, 0] as WindowOption[]).map((w) => {
               const active = w === windowMonths;
-              const label = w === 0 ? "All" : `${w}M`;
               return (
                 <button
                   key={w}
@@ -95,7 +108,7 @@ export function MonthlyOverview({
                       : "text-surface-400 hover:text-surface-200")
                   }
                 >
-                  {label}
+                  {windowLabel(w)}
                 </button>
               );
             })}
@@ -115,10 +128,10 @@ export function MonthlyOverview({
         <div className="mt-6 border-t border-surface-700/30 pt-5">
           <div className="mb-3 flex items-center gap-2">
             <h3 className="text-xs font-semibold tracking-wider uppercase text-surface-400">
-              Avg price vs spend
+              {t("monthly.avgPriceVsSpend")}
             </h3>
             <span className="text-xs text-surface-500">
-              · lower line = cheaper entry
+              {t("monthly.lowerLineHint")}
             </span>
           </div>
           <ResponsiveContainer width="100%" height={240}>
@@ -182,7 +195,7 @@ export function MonthlyOverview({
               <Bar
                 yAxisId="right"
                 dataKey="totalSpent"
-                name="Spent (R$)"
+                name={t("monthly.spentLegend")}
                 fill="#293a5e"
                 radius={[4, 4, 0, 0]}
                 maxBarSize={42}
@@ -191,7 +204,7 @@ export function MonthlyOverview({
                 yAxisId="left"
                 type="monotone"
                 dataKey="avgPrice"
-                name="Avg price (R$)"
+                name={t("monthly.avgPriceLegend")}
                 stroke="#f59e0b"
                 strokeWidth={2}
                 dot={{ fill: "#f59e0b", r: 3, strokeWidth: 0 }}
@@ -210,7 +223,7 @@ export function MonthlyOverview({
       {onlyOneMonth && (
         <p className="mt-4 flex items-center gap-1.5 text-xs text-surface-500">
           <Info className="h-3 w-3" />
-          Keep stacking — month-over-month comparison unlocks next month.
+          {t("monthly.keepStacking")}
         </p>
       )}
     </div>
@@ -218,11 +231,12 @@ export function MonthlyOverview({
 }
 
 function Header() {
+  const { t } = useTranslation();
   return (
     <div className="mb-4 flex items-center gap-2">
       <CalendarRange className="h-4 w-4 text-amber-glow" />
       <h2 className="text-sm font-semibold tracking-wide uppercase text-surface-300">
-        Monthly Overview
+        {t("monthly.monthlyOverview")}
       </h2>
     </div>
   );
@@ -234,6 +248,7 @@ interface MonthCardProps {
 }
 
 function MonthCard({ month, variant }: MonthCardProps) {
+  const { t } = useTranslation();
   const isAdmin = variant === "admin";
   const admin = month as MonthlyBreakdown;
 
@@ -256,36 +271,29 @@ function MonthCard({ month, variant }: MonthCardProps) {
       {/* BTC — lead metric */}
       <div className="mb-1 flex items-baseline gap-1.5">
         <span className="font-mono text-xl font-bold tabular-nums text-amber-glow">
-          {month.totalBtc.toFixed(6)}
+          {formatBtc(month.totalBtc, 6)}
         </span>
         <span className="text-xs text-surface-500">BTC</span>
       </div>
 
       {/* Spent — secondary */}
       <div className="mb-3 font-mono text-xs text-surface-300 tabular-nums">
-        R$
-        {month.totalSpent.toLocaleString("pt-BR", {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        })}{" "}
-        <span className="text-surface-500">invested</span>
+        {formatCurrency(month.totalSpent)}{" "}
+        <span className="text-surface-500">{t("monthly.invested")}</span>
       </div>
 
       {/* Avg price */}
       <div className="border-t border-surface-700/30 pt-3">
         <div className="flex items-baseline justify-between">
-          <span className="text-xs text-surface-400">Avg entry</span>
+          <span className="text-xs text-surface-400">{t("monthly.avgEntry")}</span>
           <span className="font-mono text-sm font-medium tabular-nums text-surface-100">
-            R$
-            {month.avgPrice.toLocaleString("pt-BR", {
-              maximumFractionDigits: 0,
-            })}
+            {formatCurrencyCompact(month.avgPrice)}
           </span>
         </div>
 
         {isAdmin && admin.minPrice > 0 && (
           <div className="mt-1 flex items-baseline justify-between">
-            <span className="text-[11px] text-surface-500">Range</span>
+            <span className="text-[11px] text-surface-500">{t("monthly.range")}</span>
             <span className="font-mono text-[11px] tabular-nums text-surface-400">
               {formatK(admin.minPrice)}–{formatK(admin.maxPrice)}
             </span>
@@ -297,7 +305,7 @@ function MonthCard({ month, variant }: MonthCardProps) {
       {isAdmin && (
         <div className="mt-3">
           <div className="flex items-baseline justify-between">
-            <span className="text-[11px] text-surface-500">Buys</span>
+            <span className="text-[11px] text-surface-500">{t("monthly.buys")}</span>
             <span className="font-mono text-[11px] tabular-nums text-surface-400">
               {admin.orderCount}
               <span className="text-surface-600"> / ~{expected}</span>
@@ -316,11 +324,12 @@ function MonthCard({ month, variant }: MonthCardProps) {
 }
 
 function DeltaChip({ pct }: { pct: number | null }) {
+  const { t } = useTranslation();
   if (pct === null) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full border border-surface-700/40 bg-surface-800/50 px-2 py-0.5 font-mono text-[10px] text-surface-500">
         <Minus className="h-2.5 w-2.5" />
-        baseline
+        {t("monthly.baseline")}
       </span>
     );
   }
@@ -333,7 +342,7 @@ function DeltaChip({ pct }: { pct: number | null }) {
     return (
       <span className="inline-flex items-center gap-1 rounded-full border border-surface-700/40 bg-surface-800/50 px-2 py-0.5 font-mono text-[10px] text-surface-400">
         <Minus className="h-2.5 w-2.5" />
-        flat
+        {t("monthly.flat")}
       </span>
     );
   }
@@ -347,14 +356,12 @@ function DeltaChip({ pct }: { pct: number | null }) {
     <span
       className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[10px] ${cls}`}
       title={
-        cheaper
-          ? "Cheaper average entry than previous month"
-          : "More expensive average entry than previous month"
+        cheaper ? t("monthly.cheaperEntry") : t("monthly.moreExpensiveEntry")
       }
     >
       <Arrow className="h-2.5 w-2.5" />
       {cheaper ? "" : "+"}
-      {pct.toFixed(1)}%
+      {formatPercent(pct)}%
     </span>
   );
 }
@@ -365,6 +372,7 @@ function formatK(v: number): string {
 }
 
 function CustomTooltip({ active, payload, label }: any) {
+  const { t } = useTranslation();
   if (!active || !payload?.length) return null;
   const avg = payload.find((p: any) => p.dataKey === "avgPrice")?.value ?? 0;
   const spent =
@@ -376,16 +384,16 @@ function CustomTooltip({ active, payload, label }: any) {
         {label}
       </p>
       <p className="mt-1 font-mono text-sm font-medium text-amber-glow tabular-nums">
-        R${avg.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}
-        <span className="ml-1 text-[11px] text-surface-500">avg</span>
+        {formatCurrencyCompact(avg)}
+        <span className="ml-1 text-[11px] text-surface-500">
+          {t("monthly.avgSuffix")}
+        </span>
       </p>
       <p className="font-mono text-xs text-surface-300 tabular-nums">
-        R$
-        {spent.toLocaleString("pt-BR", {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        })}
-        <span className="ml-1 text-[11px] text-surface-500">spent</span>
+        {formatCurrency(spent)}
+        <span className="ml-1 text-[11px] text-surface-500">
+          {t("monthly.spentSuffix")}
+        </span>
       </p>
     </div>
   );

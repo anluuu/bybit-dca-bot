@@ -1,11 +1,18 @@
 import { Wallet } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { OrdersSummary } from "../lib/api.ts";
+import {
+  formatBtc,
+  formatCurrency,
+  formatCurrencyCompact,
+} from "../lib/format.ts";
 
 interface SpendingCardProps {
   summary: OrdersSummary;
 }
 
 export function SpendingCard({ summary }: SpendingCardProps) {
+  const { t } = useTranslation();
   const pct = Math.min(
     (summary.monthlySpent / summary.monthlyCap) * 100,
     100
@@ -18,17 +25,17 @@ export function SpendingCard({ summary }: SpendingCardProps) {
       <div className="mb-4 flex items-center gap-2">
         <Wallet className="h-4 w-4 text-amber-glow" />
         <h2 className="text-sm font-semibold tracking-wide uppercase text-surface-300">
-          Monthly Spending
+          {t("spending.monthlySpending")}
         </h2>
       </div>
 
       {/* Amount display */}
       <div className="mb-1 flex items-baseline gap-1">
         <span className="font-mono text-2xl font-bold tabular-nums text-surface-100">
-          R${summary.monthlySpent.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+          {formatCurrency(summary.monthlySpent)}
         </span>
         <span className="font-mono text-sm text-surface-400">
-          / R${summary.monthlyCap.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+          / {formatCurrency(summary.monthlyCap)}
         </span>
       </div>
 
@@ -46,25 +53,29 @@ export function SpendingCard({ summary }: SpendingCardProps) {
           />
         </div>
         <div className="mt-1.5 flex justify-between font-mono text-xs text-surface-400">
-          <span>{pct.toFixed(0)}% used</span>
-          <span>R${remaining.toFixed(0)} remaining</span>
+          <span>{t("spending.used", { pct: pct.toFixed(0) })}</span>
+          <span>
+            {t("spending.remaining", {
+              amount: formatCurrencyCompact(remaining),
+            })}
+          </span>
         </div>
       </div>
 
       {/* Stats row */}
       <div className="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-surface-700/30">
         <MiniStat
-          label="Total Spent"
-          value={`R$${summary.totalSpent.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
+          label={t("spending.totalSpent")}
+          value={formatCurrencyCompact(summary.totalSpent)}
         />
         <MiniStat
-          label="Total BTC"
-          value={summary.totalBtc.toFixed(6)}
+          label={t("spending.totalBtc")}
+          value={formatBtc(summary.totalBtc, 6)}
           accent
         />
         <MiniStat
-          label="Avg Price"
-          value={`R$${summary.avgPrice.toLocaleString("pt-BR", { maximumFractionDigits: 0 })}`}
+          label={t("spending.avgPrice")}
+          value={formatCurrencyCompact(summary.avgPrice)}
         />
       </div>
     </div>

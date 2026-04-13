@@ -9,8 +9,10 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { TrendingUp, Bitcoin, Clock } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { Order, ChartPoint } from "../lib/api.ts";
 import { nextSundayLabel } from "../lib/nextBuy.ts";
+import { formatBtc, formatCurrency, formatDateShort } from "../lib/format.ts";
 
 interface AccumulationChartProps {
   orders?: Order[];
@@ -24,13 +26,11 @@ interface DisplayPoint {
 }
 
 export function AccumulationChart({ orders, points }: AccumulationChartProps) {
+  const { t } = useTranslation();
   const data = useMemo<DisplayPoint[]>(() => {
     if (points) {
       return points.map((p) => ({
-        date: new Date(p.date).toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-        }),
+        date: formatDateShort(p.date),
         btc: p.btc,
         spent: p.spent,
       }));
@@ -52,14 +52,12 @@ export function AccumulationChart({ orders, points }: AccumulationChartProps) {
       cumulativeBtc += parseFloat(o.quantity!);
       cumulativeSpent += parseFloat(o.fiatSpent!);
       return {
-        date: new Date(o.executedAt).toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-        }),
+        date: formatDateShort(o.executedAt),
         btc: parseFloat(cumulativeBtc.toFixed(8)),
         spent: parseFloat(cumulativeSpent.toFixed(2)),
       };
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orders, points]);
 
   if (data.length === 0) {
@@ -68,10 +66,10 @@ export function AccumulationChart({ orders, points }: AccumulationChartProps) {
         <div className="mb-4 flex items-center gap-2">
           <TrendingUp className="h-4 w-4 text-amber-glow" />
           <h2 className="text-sm font-semibold tracking-wide uppercase text-surface-300">
-            BTC Accumulation
+            {t("chart.btcAccumulation")}
           </h2>
           <span className="ml-auto font-mono text-xs text-surface-500">
-            waiting for first fill
+            {t("chart.waitingFirstFill")}
           </span>
         </div>
         <div className="relative flex h-56 flex-col items-center justify-center gap-3 overflow-hidden rounded-lg border border-dashed border-surface-700/40">
@@ -105,11 +103,11 @@ export function AccumulationChart({ orders, points }: AccumulationChartProps) {
           </div>
           <div className="relative z-10 text-center">
             <p className="text-sm font-medium text-surface-200">
-              Your stack starts here
+              {t("chart.stackStartsHere")}
             </p>
             <p className="mt-1 flex items-center justify-center gap-1.5 font-mono text-xs text-surface-400">
               <Clock className="h-3 w-3" />
-              First buy {nextSundayLabel()}
+              {t("chart.firstBuy", { when: nextSundayLabel() })}
             </p>
           </div>
         </div>
@@ -122,10 +120,10 @@ export function AccumulationChart({ orders, points }: AccumulationChartProps) {
       <div className="mb-4 flex items-center gap-2">
         <TrendingUp className="h-4 w-4 text-amber-glow" />
         <h2 className="text-sm font-semibold tracking-wide uppercase text-surface-300">
-          BTC Accumulation
+          {t("chart.btcAccumulation")}
         </h2>
         <span className="ml-auto font-mono text-xs text-amber-glow">
-          {data[data.length - 1]?.btc.toFixed(6)} BTC
+          {formatBtc(data[data.length - 1]?.btc ?? 0, 6)} BTC
         </span>
       </div>
 
@@ -172,6 +170,7 @@ export function AccumulationChart({ orders, points }: AccumulationChartProps) {
 }
 
 function CustomTooltip({ active, payload }: any) {
+  const { t } = useTranslation();
   if (!active || !payload?.length) return null;
 
   const point = payload[0].payload as DisplayPoint;
@@ -180,10 +179,10 @@ function CustomTooltip({ active, payload }: any) {
     <div className="rounded-lg border border-surface-700 bg-surface-900 px-3 py-2 shadow-xl">
       <p className="text-xs text-surface-400">{point.date}</p>
       <p className="mt-1 font-mono text-sm font-medium text-amber-glow">
-        {point.btc.toFixed(8)} BTC
+        {formatBtc(point.btc)} BTC
       </p>
       <p className="font-mono text-xs text-surface-300">
-        R${point.spent.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} invested
+        {t("chart.invested", { amount: formatCurrency(point.spent) })}
       </p>
     </div>
   );

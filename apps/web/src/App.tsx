@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Bitcoin, LogIn, LogOut, Eye, AlertTriangle } from "lucide-react";
 import { StatusCard } from "./components/StatusCard.tsx";
 import { SpendingCard } from "./components/SpendingCard.tsx";
@@ -154,12 +155,13 @@ function useHealth() {
 // --- Error banner ---
 
 function ErrorBanner({ message }: { message: string }) {
+  const { t } = useTranslation();
   return (
     <div className="mb-6 flex items-center gap-3 rounded-xl border border-red-loss/30 bg-red-loss/10 px-5 py-3">
       <AlertTriangle className="h-5 w-5 shrink-0 text-red-loss" />
       <div>
         <p className="text-sm font-medium text-red-loss">
-          Failed to load data
+          {t("errors.failedToLoad")}
         </p>
         <p className="text-xs text-red-loss/70">{message}</p>
       </div>
@@ -167,9 +169,26 @@ function ErrorBanner({ message }: { message: string }) {
   );
 }
 
+// --- Language switcher (minimal toggle) ---
+
+function LanguageSwitcher() {
+  const { i18n } = useTranslation();
+  const next = i18n.resolvedLanguage === "pt-BR" ? "en" : "pt-BR";
+  return (
+    <button
+      onClick={() => void i18n.changeLanguage(next)}
+      className="flex cursor-pointer items-center gap-1 rounded-lg border border-surface-700/30 bg-surface-800/40 px-2.5 py-1.5 font-mono text-xs text-surface-300 transition-colors hover:border-amber-glow/30 hover:text-amber-glow"
+      title={next === "pt-BR" ? "Português" : "English"}
+    >
+      {i18n.resolvedLanguage === "pt-BR" ? "PT" : "EN"}
+    </button>
+  );
+}
+
 // --- Admin Dashboard (full access) ---
 
 function AdminDashboard() {
+  const { t } = useTranslation();
   const { user, logout } = useAuth();
   const [page, setPage] = useState(1);
   const { data: ordersPage, error: ordersError } = useOrders(page);
@@ -188,11 +207,9 @@ function AdminDashboard() {
         </div>
         <div>
           <h1 className="text-lg font-bold tracking-tight text-surface-100">
-            DCA Bot
+            {t("app.title")}
           </h1>
-          <p className="text-xs text-surface-400">
-            Automated Bitcoin accumulation on Bybit
-          </p>
+          <p className="text-xs text-surface-400">{t("app.subtitle")}</p>
         </div>
         <div className="ml-auto flex items-center gap-3">
           <div className="hidden sm:flex items-center gap-2 rounded-lg border border-surface-700/30 bg-surface-800/40 px-3 py-1.5">
@@ -204,12 +221,13 @@ function AdminDashboard() {
           <span className="hidden sm:inline text-xs text-surface-400">
             {user?.username}
           </span>
+          <LanguageSwitcher />
           <button
             onClick={logout}
             className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-surface-700/30 bg-surface-800/40 px-3 py-1.5 text-xs text-surface-300 transition-colors hover:border-red-loss/30 hover:text-red-loss"
           >
             <LogOut className="h-3.5 w-3.5" />
-            Logout
+            {t("app.logout")}
           </button>
         </div>
       </header>
@@ -257,6 +275,7 @@ function AdminDashboard() {
 // --- Public Dashboard (read-only, limited data) ---
 
 function PublicDashboard() {
+  const { t } = useTranslation();
   const [page, setPage] = useState(1);
   const { data: summary } = usePublicSummary();
   const { data: chartPoints } = usePublicChart();
@@ -273,11 +292,9 @@ function PublicDashboard() {
         </div>
         <div>
           <h1 className="text-lg font-bold tracking-tight text-surface-100">
-            DCA Bot
+            {t("app.title")}
           </h1>
-          <p className="text-xs text-surface-400">
-            Automated Bitcoin accumulation on Bybit
-          </p>
+          <p className="text-xs text-surface-400">{t("app.subtitle")}</p>
         </div>
         <div className="ml-auto flex items-center gap-3">
           <div className="hidden sm:flex items-center gap-2 rounded-lg border border-surface-700/30 bg-surface-800/40 px-3 py-1.5">
@@ -288,8 +305,9 @@ function PublicDashboard() {
           </div>
           <div className="flex items-center gap-1.5 rounded-lg border border-surface-700/30 bg-surface-800/40 px-3 py-1.5">
             <Eye className="h-3.5 w-3.5 text-surface-400" />
-            <span className="text-xs text-surface-400">Public view</span>
+            <span className="text-xs text-surface-400">{t("app.publicView")}</span>
           </div>
+          <LanguageSwitcher />
           <a
             href="#login"
             onClick={(e) => {
@@ -299,7 +317,7 @@ function PublicDashboard() {
             className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-amber-glow/20 bg-amber-glow/10 px-3 py-1.5 text-xs text-amber-glow transition-colors hover:bg-amber-glow/20"
           >
             <LogIn className="h-3.5 w-3.5" />
-            Sign in
+            {t("app.signIn")}
           </a>
         </div>
       </header>
