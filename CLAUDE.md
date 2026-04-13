@@ -115,7 +115,9 @@ These came from real decisions during development. Don't change them without thi
 
 4. **Public dashboard exposes summaries only, not order details.** The split between `/api/public/*` and `/api/*` (auth-required) is intentional. Don't leak order IDs, fees, or per-trade details to the public view.
 
-5. **Bot is never publicly exposed.** Only the `web` (nginx) container has a host port mapping. nginx proxies `/api/*` and `/health/*` to `bot:3000` over the internal Docker network. Don't add a `ports:` entry to the bot service.
+5. **Bot is never publicly exposed.** Only the `web` (nginx) container is reachable from the internet via Traefik (Dokploy's reverse proxy). The bot uses `expose: ["3000"]` (internal Docker network only). nginx proxies `/api/*` and `/health/*` to `bot:3000`. Don't add a `ports:` entry or Traefik labels to the bot service.
+
+6. **Dokploy + Traefik for production deployment.** The `docker-compose.yml` joins the external `dokploy-network`. Web has Traefik labels for `dca-bot.luancunha.dev` with auto Let's Encrypt SSL. Don't change to `ports:` — that would bypass Traefik. Secrets like `POSTGRES_PASSWORD` are set in Dokploy's env UI, not in `.env.example`.
 
 6. **Idempotency on retries.** If a BullMQ retry runs after the limit order was already placed, the strategy should detect this and not place a duplicate. (Currently relies on the fact that retries happen after 5+ minutes, which is longer than the placement step. Improving this is on the P2 list.)
 

@@ -1,14 +1,16 @@
 services:
+  # ---- Bot (Fastify + BullMQ + Drizzle) - internal only ----
   bot:
     build:
       context: .
       dockerfile: apps/bot/Dockerfile
-    restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    expose:
+      - "3000"
     environment:
       DATABASE_URL: postgres://dca:${POSTGRES_PASSWORD}@postgres:5432/dca_bot
       REDIS_URL: redis://redis:6379
@@ -22,37 +24,43 @@ services:
       LIMIT_DISCOUNT_PCT: ${LIMIT_DISCOUNT_PCT:-0.3}
       LIMIT_WAIT_MINUTES: ${LIMIT_WAIT_MINUTES:-120}
       TRADING_PAIR: ${TRADING_PAIR:-BTCBRL}
-      PORT: ${PORT:-3000}
+      PORT: 3000
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:${PORT:-3000}/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 15s
+    networks:
+      - dokploy-network
+    restart: unless-stopped
 
+  # ---- Web (React SPA via nginx) - public via Traefik ----
   web:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
-    restart: unless-stopped
     depends_on:
       bot:
         condition: service_healthy
-    ports:
-      - "${WEB_PORT:-8080}:80"
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost/"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
+    expose:
+      - "80"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dca-bot-web.rule=Host(`dca-bot.luancunha.dev`)"
+      - "traefik.http.routers.dca-bot-web.entrypoints=websecure"
+      - "traefik.http.routers.dca-bot-web.tls.certResolver=letsencrypt"
+      - "traefik.http.services.dca-bot-web.loadbalancer.server.port=80"
+    networks:
+      - dokploy-network
+    restart: unless-stopped
 
+  # ---- Postgres ----
   postgres:
     image: postgres:16-alpine
-    restart: unless-stopped
     environment:
       POSTGRES_USER: dca
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -64,10 +72,13 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - dokploy-network
+    restart: unless-stopped
 
+  # ---- Redis (BullMQ queue + AOF persistence) ----
   redis:
     image: redis:7-alpine
-    restart: unless-stopped
     command: redis-server --appendonly yes
     volumes:
       - redisdata:/data
@@ -76,7 +87,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - dokploy-network
+    restart: unless-stopped
 
 volumes:
   pgdata:
   redisdata:
+
+networks:
+  dokploy-network:
+    external: true

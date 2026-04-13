@@ -94,24 +94,52 @@ pnpm --filter @dca/web dev   # dashboard only
 
 ---
 
-## Production Deployment
+## Production Deployment (Dokploy)
 
-Deploy on [Dokploy](https://dokploy.com/) or any Docker Compose host:
+This project deploys to [Dokploy](https://dokploy.com/) with Traefik for HTTPS.
+
+### Prerequisites on the VPS
+
+- Dokploy installed
+- Traefik running (Dokploy sets this up by default)
+- External Docker network `dokploy-network` (Dokploy creates this)
+- DNS A record: `dca-bot.luancunha.dev` → VPS IP
+
+### Deploy steps
+
+1. Push the repo and create a new Compose app in Dokploy pointing at this repo.
+2. In Dokploy's environment UI, set:
+   - `POSTGRES_PASSWORD` (strong password)
+   - `BYBIT_API_KEY`, `BYBIT_API_SECRET`
+   - `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`
+   - `ADMIN_PASSWORD` (min 8 chars)
+   - `JWT_SECRET` (`openssl rand -hex 32`)
+3. Deploy. Traefik will auto-issue a Let's Encrypt cert for `dca-bot.luancunha.dev`.
+
+### Stack (4 containers)
+
+| Service | Public? | Purpose |
+|---------|---------|---------|
+| `web` | Yes — `https://dca-bot.luancunha.dev` via Traefik | nginx serves dashboard + reverse-proxies `/api` and `/health` to bot |
+| `bot` | No — internal to `dokploy-network` | DCA service + Fastify API |
+| `postgres` | No — internal | Purchase history, asset config |
+| `redis` | No — internal | BullMQ job queue |
+
+Only `web` is reachable from the internet. The bot's API is never publicly exposed.
+
+### Local docker-compose run (testing the prod build)
+
+You can also test the prod stack locally, but Traefik labels will be ignored without an external Traefik instance. For local stack testing:
 
 ```bash
+# Create the network manually (matches the external: true declaration)
+docker network create dokploy-network
+
+# Set required env vars (or use a local .env)
 docker compose --env-file .env up -d
 ```
 
-This starts 4 containers:
-
-| Service | Image | Purpose |
-|---------|-------|---------|
-| `bot` | `apps/bot/Dockerfile` | DCA service + Fastify API (internal) |
-| `web` | `apps/web/Dockerfile` | nginx serving the dashboard + proxying API to bot |
-| `postgres` | `postgres:16-alpine` | Purchase history, asset config |
-| `redis` | `redis:7-alpine` | BullMQ job queue |
-
-Only the `web` container exposes a public port (default `8080`). The bot is reachable only inside the Docker network.
+Note: without Traefik, `web` won't be reachable on a port. Add a temporary `ports: ["8080:80"]` to the web service for local testing if needed.
 
 ---
 
@@ -142,10 +170,15 @@ All configuration is via environment variables. See `.env.example` for the full 
 | `LIMIT_DISCOUNT_PCT` | `0.3` | Discount below market for limit order |
 | `LIMIT_WAIT_MINUTES` | `120` | How long to wait for limit fill |
 | `TRADING_PAIR` | `BTCBRL` | Bybit spot pair |
-| `REDIS_URL` | `redis://localhost:6379` | Redis connection |
-| `PORT` | `3000` | Fastify port (internal) |
-| `WEB_PORT` | `8080` | Public port for the dashboard |
 | `ADMIN_USERNAME` | `admin` | Dashboard login username |
+
+### Local-dev only (overridden in production by docker-compose.yml)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATABASE_URL` | `postgres://dca:devpassword@localhost:5432/dca_bot` | Used for `pnpm dev` against `pnpm dev:db` databases |
+| `REDIS_URL` | `redis://localhost:6379` | Local Redis |
+| `PORT` | `3000` | Bot port (internal in prod) |
 
 ---
 
