@@ -317,16 +317,16 @@ function PublicDashboard() {
           </h1>
           <p className="text-xs text-surface-400">{t("app.subtitle")}</p>
         </div>
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto flex items-center gap-2 sm:gap-3">
           <div className="hidden sm:flex items-center gap-2 rounded-lg border border-surface-700/30 bg-surface-800/40 px-3 py-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-green-gain" />
             <span className="font-mono text-xs text-surface-300">
               {status?.pair ?? "BTCBRL"}
             </span>
           </div>
-          <div className="flex items-center gap-1.5 rounded-lg border border-surface-700/30 bg-surface-800/40 px-3 py-1.5">
+          <div className="flex items-center gap-1.5 rounded-lg border border-surface-700/30 bg-surface-800/40 px-2 py-1.5 sm:px-3">
             <Eye className="h-3.5 w-3.5 text-surface-400" />
-            <span className="text-xs text-surface-400">{t("app.publicView")}</span>
+            <span className="hidden sm:inline text-xs text-surface-400">{t("app.publicView")}</span>
           </div>
           <LanguageSwitcher />
           <a
@@ -338,7 +338,7 @@ function PublicDashboard() {
             className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-amber-glow/20 bg-amber-glow/10 px-3 py-1.5 text-xs text-amber-glow transition-colors hover:bg-amber-glow/20"
           >
             <LogIn className="h-3.5 w-3.5" />
-            {t("app.signIn")}
+            <span className="hidden sm:inline">{t("app.signIn")}</span>
           </a>
         </div>
       </header>
