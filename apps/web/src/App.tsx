@@ -10,6 +10,7 @@ import { MonthlyOverview } from "./components/MonthlyOverview.tsx";
 import { OrdersTable } from "./components/OrdersTable.tsx";
 import { TestOrderCard } from "./components/TestOrderCard.tsx";
 import { RunNowCard } from "./components/RunNowCard.tsx";
+import { TelegramPingCard } from "./components/TelegramPingCard.tsx";
 import { LoginPage } from "./components/LoginPage.tsx";
 import { ErrorBoundary } from "./components/ErrorBoundary.tsx";
 import { AuthProvider, useAuth } from "./lib/auth.tsx";
@@ -285,8 +286,9 @@ function AdminDashboard() {
       )}
 
       {assets?.[0] && ordersPage && (
-        <div className="mb-6">
+        <div className="mb-6 grid gap-6 md:grid-cols-2">
           <RunNowCard pair={assets[0].pair} orders={ordersPage.data} />
+          <TelegramPingCard />
         </div>
       )}
 

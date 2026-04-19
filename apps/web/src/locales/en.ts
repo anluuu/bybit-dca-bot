@@ -172,6 +172,17 @@ export const en: Translations = {
     cancel: "Cancel",
     confirm: "Yes, retry now",
   },
+  telegramPing: {
+    title: "Telegram ping",
+    operatorOnly: "operator only",
+    description:
+      "Sends a test message to the configured Telegram chat. Use this to verify failure alerts will reach you before the next DCA runs.",
+    sendTest: "Send test message",
+    sending: "Sending…",
+    sent: "Ping request sent",
+    checkChat: "Check your Telegram chat. If nothing arrives, inspect the bot logs for the exact error.",
+    failed: "Ping request failed",
+  },
   locale: {
     switchTo: {
       "pt-BR": "Português",

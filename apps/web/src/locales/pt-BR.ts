@@ -177,6 +177,17 @@ export const ptBR = {
     cancel: "Cancelar",
     confirm: "Sim, retentar agora",
   },
+  telegramPing: {
+    title: "Teste do Telegram",
+    operatorOnly: "apenas operador",
+    description:
+      "Envia uma mensagem de teste para o chat configurado no Telegram. Use para verificar se os alertas de falha chegarão antes do próximo DCA.",
+    sendTest: "Enviar mensagem de teste",
+    sending: "Enviando…",
+    sent: "Solicitação enviada",
+    checkChat: "Verifique seu chat no Telegram. Se nada chegar, cheque os logs do bot para o erro exato.",
+    failed: "Falha ao enviar",
+  },
   locale: {
     switchTo: {
       "pt-BR": "Português",
