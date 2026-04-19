@@ -9,6 +9,31 @@ export function initBot(): Telegraf {
   return bot;
 }
 
+/**
+ * Boot-time sanity check: confirm TELEGRAM_CHAT_ID resolves. A broken chat id
+ * only surfaces today when notifyFailure() fails silently on the way out —
+ * i.e. right when the operator most needs to be alerted (see 2026-04-19
+ * "chat not found" at 08:10). Logging loudly at boot turns that silent
+ * failure into a visible startup warning.
+ */
+export async function verifyTelegramChat(): Promise<void> {
+  try {
+    const chat = await bot.telegram.getChat(config.TELEGRAM_CHAT_ID);
+    logger.info("Telegram chat verified", {
+      chatId: config.TELEGRAM_CHAT_ID,
+      type: chat.type,
+    });
+  } catch (error) {
+    logger.error(
+      "Telegram chat verification failed — failure alerts will be lost",
+      {
+        chatId: config.TELEGRAM_CHAT_ID,
+        error: error instanceof Error ? error.message : String(error),
+      }
+    );
+  }
+}
+
 function escapeMarkdown(text: string): string {
   return text.replace(/[_*[\]()~`>#+\-=|{}.!]/g, "\\$&");
 }

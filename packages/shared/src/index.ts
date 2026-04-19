@@ -65,6 +65,20 @@ export interface TestOrderPreview {
 }
 
 /**
+ * Result of a one-shot admin-triggered DCA run (POST /api/admin/run-now).
+ * Unlike test orders, this executes the full DCA flow (limit → poll → market
+ * fallback) and is NOT tagged is_test, so it counts toward the monthly cap
+ * and appears in public history — intended for catching up a missed weekly
+ * cron, not for sanity-checking.
+ */
+export interface AdminRunNowResult {
+  pair: string;
+  status: "started" | "failed";
+  errorMessage: string | null;
+  startedAt: string;
+}
+
+/**
  * Result of a real test order executed on POST /api/test/execute.
  * Always a small market order tagged is_test=true in the DB.
  */

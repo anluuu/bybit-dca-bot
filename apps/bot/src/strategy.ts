@@ -12,6 +12,7 @@ import {
   ExchangeApiError,
   type OrderDetail,
 } from "./exchange.js";
+import { getInstrumentInfo, roundDownToStep } from "./instrumentInfo.js";
 import { getMonthlySpent } from "./spending.js";
 import {
   notifySuccess,
@@ -121,13 +122,17 @@ export async function executeDca(asset: Asset): Promise<void> {
     throw error;
   }
 
-  // 4. Calculate limit order params
+  // 4. Calculate limit order params. Price and qty must match the pair's
+  // exchange-side step sizes (tickSize / basePrecision) — hardcoded decimals
+  // caused prod rejection "Order price has too many decimals" (code 170134)
+  // on 2026-04-19 when the BTCBRL tick widened. Instrument info is cached
+  // for 24h; a miss here falls back to ExchangeApiError → retryable.
+  const instrument = await getInstrumentInfo(pair);
   const limitPrice = currentPrice * (1 - limitDiscount / 100);
   const quantity = buyAmount / limitPrice;
 
-  // Round price to 2 decimals, quantity to 6 decimals (Bybit BTC/BRL typical)
-  const priceStr = limitPrice.toFixed(2);
-  const qtyStr = quantity.toFixed(6);
+  const priceStr = roundDownToStep(limitPrice, instrument.tickSize);
+  const qtyStr = roundDownToStep(quantity, instrument.basePrecision);
 
   // 5. Place limit order
   let limitOrderId: string;

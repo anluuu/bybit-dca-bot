@@ -14,11 +14,12 @@ import { db } from "./db/client.js";
 import { sql as pgClient } from "./db/client.js";
 import { assets, orders } from "./db/schema.js";
 import { logger } from "./logger.js";
-import { executeTestOrder } from "./strategy.js";
+import { executeDca, executeTestOrder } from "./strategy.js";
+import { notifyFailure } from "./notifications.js";
 import { getTickerPrice, ExchangeClientError } from "./exchange.js";
 import { getMonthlySpent } from "./spending.js";
 import { getCompositeSignal } from "./signals/compose.js";
-import type { PublicSignals } from "@dca/shared";
+import type { AdminRunNowResult, PublicSignals } from "@dca/shared";
 
 const startTime = Date.now();
 
@@ -655,6 +656,90 @@ export async function startServer(redisConnection: Redis) {
         }
         return reply.status(500).send({ error: msg });
       }
+    }
+  );
+
+  // --- Admin run-now (one-shot real DCA, counts toward cap) ---
+  //
+  // Intended for catching up a missed weekly cron (e.g. 2026-04-19 failure).
+  // Unlike /api/test/execute this runs the full strategy — limit + market
+  // fallback + monthly-cap check — and persists real (is_test=false) rows.
+  // executeDca polls for up to limitWaitMins, so we fire-and-forget and
+  // reply 202. Rate-limited 1/min to prevent accidental double-fires.
+
+  const runNowBodySchema = z.object({
+    pair: z.string().min(1).max(20),
+  });
+
+  app.post(
+    "/api/admin/run-now",
+    {
+      ...authPreHandler,
+      config: { rateLimit: { max: 1, timeWindow: "1 minute" } },
+    },
+    async (request, reply) => {
+      const parsed = runNowBodySchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send({ error: "Invalid body" });
+      }
+      const { pair } = parsed.data;
+
+      const [asset] = await db
+        .select()
+        .from(assets)
+        .where(sql`${assets.pair} = ${pair}`)
+        .limit(1);
+
+      if (!asset) {
+        return reply.status(404).send({ error: `Unknown pair: ${pair}` });
+      }
+
+      if (!asset.enabled) {
+        return reply.status(409).send({ error: `Asset disabled: ${pair}` });
+      }
+
+      const busyReason = await findBusyReason(pair);
+      if (busyReason) {
+        return reply.status(409).send({ error: busyReason });
+      }
+
+      const startedAt = new Date().toISOString();
+      logger.info("Admin triggered run-now DCA", { pair, startedAt });
+
+      // Fire-and-forget: executeDca polls the limit order for minutes, so
+      // we can't hold the HTTP connection. Errors are already surfaced via
+      // Telegram + DB rows inside the strategy/queue flow.
+      void executeDca(asset).catch(async (error) => {
+        const msg = error instanceof Error ? error.message : String(error);
+        logger.error("run-now DCA failed", { pair, error: msg });
+        // Parity with worker.on("failed"): persist a failed row so the
+        // dashboard shows the attempt, then fire a Telegram alert. Only the
+        // worker path gates on attemptsMade; run-now has no retry, so we
+        // persist unconditionally.
+        try {
+          await db.insert(orders).values({
+            assetId: asset.id,
+            pair: asset.pair,
+            orderType: "limit",
+            status: "failed",
+            errorMessage: msg,
+          });
+          await notifyFailure(`${msg} (admin run-now)`, asset.pair);
+        } catch (inner) {
+          logger.error("run-now failure recording also failed", {
+            pair,
+            error: inner instanceof Error ? inner.message : String(inner),
+          });
+        }
+      });
+
+      const body: AdminRunNowResult = {
+        pair,
+        status: "started",
+        errorMessage: null,
+        startedAt,
+      };
+      return reply.status(202).send(body);
     }
   );
 

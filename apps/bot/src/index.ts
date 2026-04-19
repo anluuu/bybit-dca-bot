@@ -5,8 +5,9 @@ import { runMigrations } from "./db/migrate.js";
 import { assets } from "./db/schema.js";
 import { createRedisConnection, setupQueue, registerJobs } from "./queue.js";
 import { startServer } from "./server.js";
-import { initBot } from "./notifications.js";
+import { initBot, verifyTelegramChat } from "./notifications.js";
 import { initSignalsCache } from "./signals/cache.js";
+import { warmInstrumentCache } from "./instrumentInfo.js";
 import { logger } from "./logger.js";
 
 async function seedAssets() {
@@ -40,19 +41,27 @@ async function main() {
   // 2. Seed assets if empty
   await seedAssets();
 
-  // 3. Initialize Telegram bot
+  // 3. Initialize Telegram bot + verify chat id reachable. A broken chat id
+  // would make every failure notification silently disappear.
   initBot();
+  await verifyTelegramChat();
 
-  // 4. Initialize Redis + BullMQ. The same Redis connection backs the signal
+  // 4. Warm instrument-info cache for every enabled asset. Placing an order
+  // requires tick/step sizes — fetching them up-front avoids a first-request
+  // failure when the weekly cron fires.
+  const enabled = await db.select().from(assets);
+  await warmInstrumentCache(enabled.map((a) => a.pair));
+
+  // 5. Initialize Redis + BullMQ. The same Redis connection backs the signal
   // cache (signals/cache.ts) — no need to open a second connection.
   const redisConnection = createRedisConnection();
   initSignalsCache(redisConnection);
   const { queue, worker } = await setupQueue(redisConnection);
 
-  // 5. Register repeatable jobs
+  // 6. Register repeatable jobs
   await registerJobs(queue);
 
-  // 6. Start Fastify server
+  // 7. Start Fastify server
   const server = await startServer(redisConnection);
 
   logger.info("Bot is running", {
@@ -62,7 +71,7 @@ async function main() {
     port: config.PORT,
   });
 
-  // 7. Graceful shutdown
+  // 8. Graceful shutdown
   const shutdown = async (signal: string) => {
     logger.info(`Received ${signal}, shutting down...`);
 

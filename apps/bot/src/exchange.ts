@@ -108,8 +108,29 @@ function handleResponse<T>(data: BybitResponse<T>, context: string): T {
 
   const msg = `${context}: ${data.retMsg} (code: ${data.retCode})`;
 
-  // Non-retryable error codes
-  const nonRetryable = [10001, 10003, 10004, 10005, 110001, 170131];
+  // Non-retryable error codes. Input/validation failures must NOT be retried:
+  // every retry repeats the same bad payload, wastes the retry budget, and
+  // delays visibility of the real bug. 170130–170140 covers Bybit's spot
+  // order-validation family (price decimals, qty decimals, min qty, etc.)
+  // incl. 170134 seen 2026-04-19.
+  const nonRetryable = [
+    10001,
+    10003,
+    10004,
+    10005,
+    110001,
+    170130, // invalid order qty
+    170131,
+    170132,
+    170133,
+    170134, // price has too many decimals
+    170135,
+    170136,
+    170137, // qty has too many decimals
+    170138,
+    170139,
+    170140, // order value too small
+  ];
   if (nonRetryable.includes(data.retCode)) {
     throw new ExchangeClientError(msg, data.retCode);
   }
