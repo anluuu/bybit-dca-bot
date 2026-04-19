@@ -51,11 +51,16 @@ export function AccumulationChart({ orders, points }: AccumulationChartProps) {
       }));
     }
 
-    // Admin path: derive cumulative series from raw Order rows.
+    // Admin path: derive cumulative series from raw Order rows. Test orders
+    // are tagged is_test=true on the server and must be excluded here so the
+    // admin chart matches `/api/orders/summary` (which filters server-side)
+    // and the public chart (pre-filtered by `/api/public/chart`). Missing
+    // this filter inflated admin totals by every test order the operator
+    // fired from TestOrderCard.
     if (!orders) return [];
 
     const filledOrders = orders
-      .filter((o) => o.status === "filled" && o.quantity)
+      .filter((o) => o.status === "filled" && !o.isTest && o.quantity)
       .sort(
         (a, b) =>
           new Date(a.executedAt).getTime() - new Date(b.executedAt).getTime()
