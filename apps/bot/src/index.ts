@@ -8,6 +8,7 @@ import { startServer } from "./server.js";
 import { initBot, verifyTelegramChat } from "./notifications.js";
 import { initSignalsCache } from "./signals/cache.js";
 import { warmInstrumentCache } from "./instrumentInfo.js";
+import { reconcilePendingOrders } from "./recovery.js";
 import { logger } from "./logger.js";
 
 async function seedAssets() {
@@ -52,16 +53,23 @@ async function main() {
   const enabled = await db.select().from(assets);
   await warmInstrumentCache(enabled.map((a) => a.pair));
 
-  // 5. Initialize Redis + BullMQ. The same Redis connection backs the signal
+  // 5. Reconcile any `pending` rows left behind by a previous process death.
+  // executeDca polls for fill inside the same process that placed the order,
+  // so a deploy mid-flight strands the row at `pending` even though Bybit may
+  // have already filled it. Sweep before registering jobs so a redeployment
+  // converges the DB to reality before anything new runs.
+  await reconcilePendingOrders();
+
+  // 6. Initialize Redis + BullMQ. The same Redis connection backs the signal
   // cache (signals/cache.ts) — no need to open a second connection.
   const redisConnection = createRedisConnection();
   initSignalsCache(redisConnection);
   const { queue, worker } = await setupQueue(redisConnection);
 
-  // 6. Register repeatable jobs
+  // 7. Register repeatable jobs
   await registerJobs(queue);
 
-  // 7. Start Fastify server
+  // 8. Start Fastify server
   const server = await startServer(redisConnection);
 
   logger.info("Bot is running", {
@@ -71,7 +79,7 @@ async function main() {
     port: config.PORT,
   });
 
-  // 8. Graceful shutdown
+  // 9. Graceful shutdown
   const shutdown = async (signal: string) => {
     logger.info(`Received ${signal}, shutting down...`);
 
