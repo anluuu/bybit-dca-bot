@@ -1,5 +1,10 @@
 import { useState, useEffect } from "react";
-import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
+import {
+  QueryClient,
+  QueryClientProvider,
+  keepPreviousData,
+  useQuery,
+} from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Bitcoin, LogIn, LogOut, Eye, AlertTriangle } from "lucide-react";
 import { StatusCard } from "./components/StatusCard.tsx";
@@ -70,6 +75,11 @@ function useOrders(
       if (!res.ok) throw new Error(`Failed to load orders (${res.status})`);
       return res.json();
     },
+    // Prev rows stay visible while the new filter/page refetches, so the
+    // ordersPage && (...) guard in AdminDashboard does not collapse the
+    // whole section between requests — that collapse was snapping scroll
+    // back to top on every filter click.
+    placeholderData: keepPreviousData,
   });
 }
 
