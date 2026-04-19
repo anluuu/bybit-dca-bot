@@ -15,7 +15,7 @@ import { sql as pgClient } from "./db/client.js";
 import { assets, orders } from "./db/schema.js";
 import { logger } from "./logger.js";
 import { executeDca, executeTestOrder } from "./strategy.js";
-import { notifyFailure } from "./notifications.js";
+import { notifyFailure, notifyPing } from "./notifications.js";
 import { getTickerPrice, ExchangeClientError } from "./exchange.js";
 import { getMonthlySpent } from "./spending.js";
 import { getCompositeSignal } from "./signals/compose.js";
@@ -740,6 +740,24 @@ export async function startServer(redisConnection: Redis) {
         startedAt,
       };
       return reply.status(202).send(body);
+    }
+  );
+
+  // --- Admin Telegram diagnostic ---
+  //
+  // Send a test message to TELEGRAM_CHAT_ID. If this returns 200 but no
+  // Telegram message arrives, check bot logs for "Telegram notification
+  // failed" (bad chat id, revoked token, network block). Rate-limited 5/min.
+
+  app.post(
+    "/api/admin/telegram/ping",
+    {
+      ...authPreHandler,
+      config: { rateLimit: { max: 5, timeWindow: "1 minute" } },
+    },
+    async (_request, _reply) => {
+      await notifyPing("Manual ping from admin dashboard.");
+      return { ok: true, sentAt: new Date().toISOString() };
     }
   );
 

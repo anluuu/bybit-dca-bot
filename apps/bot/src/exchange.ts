@@ -45,7 +45,8 @@ export interface OrderDetail {
   cumExecQty: string;
   cumExecValue: string;
   cumExecFee: string;
-  feeCurrency: string;
+  /** Bybit sometimes omits this on spot fills; treat as optional. */
+  feeCurrency: string | null;
 }
 
 // HMAC-SHA256 signing
