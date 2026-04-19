@@ -9,6 +9,7 @@ import { AccumulationChart } from "./components/AccumulationChart.tsx";
 import { MonthlyOverview } from "./components/MonthlyOverview.tsx";
 import { OrdersTable } from "./components/OrdersTable.tsx";
 import { TestOrderCard } from "./components/TestOrderCard.tsx";
+import { RunNowCard } from "./components/RunNowCard.tsx";
 import { LoginPage } from "./components/LoginPage.tsx";
 import { ErrorBoundary } from "./components/ErrorBoundary.tsx";
 import { AuthProvider, useAuth } from "./lib/auth.tsx";
@@ -281,6 +282,12 @@ function AdminDashboard() {
             />
           </div>
         </>
+      )}
+
+      {assets?.[0] && ordersPage && (
+        <div className="mb-6">
+          <RunNowCard pair={assets[0].pair} orders={ordersPage.data} />
+        </div>
       )}
 
       {assets?.[0] && (

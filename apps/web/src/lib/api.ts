@@ -11,6 +11,7 @@ export type {
   AuthUser,
   TestOrderPreview,
   TestOrderResult,
+  AdminRunNowResult,
   MonthlyBreakdown,
   PublicMonthlyBreakdown,
   PublicOrder,

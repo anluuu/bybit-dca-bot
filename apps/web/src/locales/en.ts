@@ -152,6 +152,26 @@ export const en: Translations = {
     placeOrder: "Place real order",
     placing: "Placing…",
   },
+  runNow: {
+    title: "Retry missed DCA",
+    operatorOnly: "operator only",
+    description:
+      "Re-runs the full weekly DCA flow (limit → market fallback) and counts toward the monthly cap. Enabled only when the most recent DCA on this pair failed.",
+    retry: "Retry last DCA",
+    starting: "Starting…",
+    started: "Retry started",
+    startedDetail:
+      "The bot is placing a new limit order. Watch the orders table — it can take up to a couple of hours to fill or fall back to market.",
+    noHistory: "No DCA history yet — nothing to retry.",
+    lastNotFailed: "Last DCA is {{status}}, not failed — retry disabled.",
+    lastErrorLabel: "Last failure",
+    failedToStart: "Could not start retry",
+    confirmTitle: "Retry last DCA?",
+    confirmBody:
+      "This will place a real buy on Bybit for {{pair}} and count toward the monthly cap. Continue?",
+    cancel: "Cancel",
+    confirm: "Yes, retry now",
+  },
   locale: {
     switchTo: {
       "pt-BR": "Português",

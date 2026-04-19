@@ -157,6 +157,26 @@ export const ptBR = {
     placeOrder: "Executar ordem real",
     placing: "Executando…",
   },
+  runNow: {
+    title: "Retentar DCA perdido",
+    operatorOnly: "apenas operador",
+    description:
+      "Executa novamente o fluxo semanal completo (limite → fallback de mercado) e conta no limite mensal. Habilitado apenas quando o último DCA deste par falhou.",
+    retry: "Retentar último DCA",
+    starting: "Iniciando…",
+    started: "Retentativa iniciada",
+    startedDetail:
+      "O bot está colocando uma nova ordem limite. Acompanhe a tabela de ordens — pode levar algumas horas para executar ou cair em fallback de mercado.",
+    noHistory: "Sem histórico de DCA — nada para retentar.",
+    lastNotFailed: "Último DCA está {{status}}, não falhou — retentativa desabilitada.",
+    lastErrorLabel: "Última falha",
+    failedToStart: "Não foi possível iniciar a retentativa",
+    confirmTitle: "Retentar último DCA?",
+    confirmBody:
+      "Isto executará uma compra real na Bybit para {{pair}} e contará no limite mensal. Continuar?",
+    cancel: "Cancelar",
+    confirm: "Sim, retentar agora",
+  },
   locale: {
     switchTo: {
       "pt-BR": "Português",
