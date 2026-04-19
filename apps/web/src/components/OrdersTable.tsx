@@ -5,6 +5,7 @@ import {
   Clock,
   ListOrdered,
   PackageOpen,
+  Filter,
 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -40,12 +41,40 @@ type OrderRow = {
   fearGreedIndex?: number | null;
 };
 
+/**
+ * Visible order statuses in the filter control, kept in a stable order so the
+ * rendered chip row does not jitter when toggling.
+ */
+export const FILTERABLE_STATUSES = [
+  "filled",
+  "pending",
+  "skipped_cap",
+  "cancelled",
+  "failed",
+] as const;
+export type FilterableStatus = (typeof FILTERABLE_STATUSES)[number];
+
+export interface OrderFilters {
+  /** Empty array = no status filter (show all). */
+  statuses: FilterableStatus[];
+  includeTest: boolean;
+}
+
+export const DEFAULT_ADMIN_FILTERS: OrderFilters = {
+  statuses: ["filled", "pending", "skipped_cap", "cancelled"],
+  includeTest: false,
+};
+
 interface OrdersTableProps {
   orders: ReadonlyArray<Order | PublicOrder>;
   page?: number;
   totalPages?: number;
   total?: number;
   onPageChange?: (page: number) => void;
+  /** When present, a filter row is rendered. Admin only — public orders
+   * intentionally expose the raw history with no client-side toggles. */
+  filters?: OrderFilters;
+  onFiltersChange?: (next: OrderFilters) => void;
 }
 
 type SortKey = "executedAt" | "fiatSpent" | "price";
@@ -75,12 +104,29 @@ export function OrdersTable({
   totalPages,
   total,
   onPageChange,
+  filters,
+  onFiltersChange,
 }: OrdersTableProps) {
   const { t } = useTranslation();
   const [sortKey, setSortKey] = useState<SortKey>("executedAt");
   const [sortAsc, setSortAsc] = useState(false);
 
   const rows: OrderRow[] = orders as unknown as OrderRow[];
+  const showFilters = Boolean(filters && onFiltersChange);
+
+  const toggleStatus = (status: FilterableStatus) => {
+    if (!filters || !onFiltersChange) return;
+    const active = filters.statuses.includes(status);
+    const next = active
+      ? filters.statuses.filter((s) => s !== status)
+      : [...filters.statuses, status];
+    onFiltersChange({ ...filters, statuses: next });
+  };
+
+  const toggleIncludeTest = () => {
+    if (!filters || !onFiltersChange) return;
+    onFiltersChange({ ...filters, includeTest: !filters.includeTest });
+  };
 
   if (rows.length === 0) {
     return (
@@ -94,6 +140,13 @@ export function OrdersTable({
             {t("orders.count", { count: 0 })}
           </span>
         </div>
+        {showFilters && filters && (
+          <FilterBar
+            filters={filters}
+            onToggleStatus={toggleStatus}
+            onToggleIncludeTest={toggleIncludeTest}
+          />
+        )}
         <div className="flex flex-col items-center justify-center gap-3 px-6 py-14">
           <div className="flex h-12 w-12 items-center justify-center rounded-full border border-amber-glow/20 bg-amber-glow/5">
             <PackageOpen className="h-5 w-5 text-amber-glow" />
@@ -158,6 +211,14 @@ export function OrdersTable({
           {t("orders.count", { count: total ?? rows.length })}
         </span>
       </div>
+
+      {showFilters && filters && (
+        <FilterBar
+          filters={filters}
+          onToggleStatus={toggleStatus}
+          onToggleIncludeTest={toggleIncludeTest}
+        />
+      )}
 
       <div className="overflow-x-auto">
         <table className="w-full min-w-[700px] text-left">
@@ -290,6 +351,58 @@ export function OrdersTable({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function FilterBar({
+  filters,
+  onToggleStatus,
+  onToggleIncludeTest,
+}: {
+  filters: OrderFilters;
+  onToggleStatus: (status: FilterableStatus) => void;
+  onToggleIncludeTest: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex flex-wrap items-center gap-2 border-b border-surface-700/30 px-5 py-3">
+      <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-surface-500">
+        <Filter className="h-3 w-3" />
+        {t("orders.filters.label")}
+      </span>
+      {FILTERABLE_STATUSES.map((status) => {
+        const active = filters.statuses.includes(status);
+        return (
+          <button
+            key={status}
+            onClick={() => onToggleStatus(status)}
+            className={`cursor-pointer rounded-md border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider transition-colors ${
+              active
+                ? "border-amber-glow/40 bg-amber-glow/10 text-amber-glow"
+                : "border-surface-700/40 bg-surface-800/30 text-surface-500 hover:text-surface-300"
+            }`}
+          >
+            {t(`orderStatus.${status}`, {
+              defaultValue: status.replace("_", " "),
+            })}
+          </button>
+        );
+      })}
+      <span className="mx-1 h-4 w-px bg-surface-700/40" aria-hidden />
+      <button
+        onClick={onToggleIncludeTest}
+        className={`cursor-pointer rounded-md border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider transition-colors ${
+          filters.includeTest
+            ? "border-violet-tech/40 bg-violet-tech/10 text-violet-tech"
+            : "border-surface-700/40 bg-surface-800/30 text-surface-500 hover:text-surface-300"
+        }`}
+        aria-pressed={filters.includeTest}
+      >
+        {filters.includeTest
+          ? t("orders.filters.testsOn")
+          : t("orders.filters.testsOff")}
+      </button>
     </div>
   );
 }

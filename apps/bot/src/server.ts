@@ -180,6 +180,35 @@ export async function startServer(redisConnection: Redis) {
     pageSize: z.coerce.number().int().min(1).max(100).default(25),
   });
 
+  // Admin-only extra filters. Public listing intentionally stays unfiltered
+  // so search engines / casual viewers see the same raw history every time.
+  const ALLOWED_STATUSES = [
+    "filled",
+    "failed",
+    "cancelled",
+    "pending",
+    "skipped_cap",
+  ] as const;
+  const adminOrdersQuerySchema = ordersQuerySchema.extend({
+    status: z
+      .string()
+      .optional()
+      .transform((v) =>
+        v
+          ? v
+              .split(",")
+              .map((s) => s.trim())
+              .filter((s): s is (typeof ALLOWED_STATUSES)[number] =>
+                (ALLOWED_STATUSES as readonly string[]).includes(s)
+              )
+          : undefined
+      ),
+    includeTest: z
+      .string()
+      .optional()
+      .transform((v) => v !== "false"),
+  });
+
   app.get("/api/public/summary", async () => {
     const now = new Date();
     const startOfMonth = new Date(
@@ -435,22 +464,37 @@ export async function startServer(redisConnection: Redis) {
   // --- Private API (auth required) ---
 
   app.get("/api/orders", authPreHandler, async (request, reply) => {
-    const parsed = ordersQuerySchema.safeParse(request.query);
+    const parsed = adminOrdersQuerySchema.safeParse(request.query);
     if (!parsed.success) {
       return reply.status(400).send({ error: "Invalid query params" });
     }
-    const { page, pageSize } = parsed.data;
+    const { page, pageSize, status, includeTest } = parsed.data;
+
+    // Build WHERE from optional filters. Paginate AND count against the same
+    // predicate so totalPages reflects the filtered view — filtering client
+    // side would lie about totalPages and break pagination past the first
+    // page of hidden rows.
+    const conditions = [sql`1 = 1`];
+    if (status && status.length > 0) {
+      conditions.push(sql`${orders.status} IN ${status}`);
+    }
+    if (!includeTest) {
+      conditions.push(sql`${orders.isTest} = false`);
+    }
+    const whereClause = sql.join(conditions, sql` AND `);
 
     const [rows, count] = await Promise.all([
       db
         .select()
         .from(orders)
+        .where(whereClause)
         .orderBy(desc(orders.executedAt))
         .limit(pageSize)
         .offset((page - 1) * pageSize),
       db
         .select({ total: sql<string>`COUNT(*)` })
-        .from(orders),
+        .from(orders)
+        .where(whereClause),
     ]);
 
     return {

@@ -7,7 +7,11 @@ import { SpendingCard } from "./components/SpendingCard.tsx";
 import { SignalsPanel } from "./components/SignalsPanel.tsx";
 import { AccumulationChart } from "./components/AccumulationChart.tsx";
 import { MonthlyOverview } from "./components/MonthlyOverview.tsx";
-import { OrdersTable } from "./components/OrdersTable.tsx";
+import {
+  OrdersTable,
+  DEFAULT_ADMIN_FILTERS,
+  type OrderFilters,
+} from "./components/OrdersTable.tsx";
 import { TestOrderCard } from "./components/TestOrderCard.tsx";
 import { RunNowCard } from "./components/RunNowCard.tsx";
 import { TelegramPingCard } from "./components/TelegramPingCard.tsx";
@@ -38,14 +42,31 @@ const queryClient = new QueryClient({
 
 // --- Hooks for authenticated (admin) data ---
 
-function useOrders(page: number, pageSize: number = 25) {
+function useOrders(
+  page: number,
+  pageSize: number = 25,
+  filters: OrderFilters = DEFAULT_ADMIN_FILTERS
+) {
   return useQuery<OrdersPage>({
-    queryKey: ["orders", page, pageSize],
+    queryKey: [
+      "orders",
+      page,
+      pageSize,
+      filters.statuses.join(","),
+      filters.includeTest,
+    ],
     queryFn: async () => {
-      const res = await fetch(
-        `/api/orders?page=${page}&pageSize=${pageSize}`,
-        { credentials: "include" }
-      );
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(pageSize),
+        includeTest: String(filters.includeTest),
+      });
+      if (filters.statuses.length > 0) {
+        params.set("status", filters.statuses.join(","));
+      }
+      const res = await fetch(`/api/orders?${params.toString()}`, {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error(`Failed to load orders (${res.status})`);
       return res.json();
     },
@@ -206,7 +227,8 @@ function AdminDashboard() {
   const { t } = useTranslation();
   const { user, logout } = useAuth();
   const [page, setPage] = useState(1);
-  const { data: ordersPage, error: ordersError } = useOrders(page);
+  const [filters, setFilters] = useState<OrderFilters>(DEFAULT_ADMIN_FILTERS);
+  const { data: ordersPage, error: ordersError } = useOrders(page, 25, filters);
   const { data: assets, error: assetsError } = useAssets();
   const { data: summary, error: summaryError } = useSummary();
   const { data: monthly, error: monthlyError } = useMonthly();
@@ -280,6 +302,14 @@ function AdminDashboard() {
               totalPages={ordersPage.totalPages}
               total={ordersPage.total}
               onPageChange={setPage}
+              filters={filters}
+              onFiltersChange={(next) => {
+                setFilters(next);
+                // Reset to page 1 when filters change — filtered totalPages
+                // may be smaller than current `page`, which would otherwise
+                // render an empty past-the-end view.
+                setPage(1);
+              }}
             />
           </div>
         </>

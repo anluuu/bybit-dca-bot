@@ -71,6 +71,11 @@ export const en: Translations = {
     empty: {
       title: "Waiting for the first fill",
     },
+    filters: {
+      label: "Show",
+      testsOn: "Tests on",
+      testsOff: "Tests off",
+    },
   },
   orderStatus: {
     filled: "filled",

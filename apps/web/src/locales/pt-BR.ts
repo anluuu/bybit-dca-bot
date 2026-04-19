@@ -75,6 +75,11 @@ export const ptBR = {
     empty: {
       title: "Aguardando o primeiro preenchimento",
     },
+    filters: {
+      label: "Mostrar",
+      testsOn: "Testes on",
+      testsOff: "Testes off",
+    },
   },
   orderStatus: {
     filled: "preenchida",
