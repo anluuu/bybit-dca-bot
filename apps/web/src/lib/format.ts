@@ -1,4 +1,34 @@
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
+import advancedFormat from "dayjs/plugin/advancedFormat";
+import localizedFormat from "dayjs/plugin/localizedFormat";
+import "dayjs/locale/pt-br";
+import "dayjs/locale/en";
 import { i18n } from "./i18n.ts";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+dayjs.extend(advancedFormat);
+dayjs.extend(localizedFormat);
+
+/**
+ * Per-locale display timezone. The bot stores everything in UTC, but humans
+ * read the dashboard in their own wall clock — pt-BR viewers expect
+ * America/Sao_Paulo; en viewers we keep on UTC to match server logs.
+ */
+const DISPLAY_TZ: Record<string, string> = {
+  "pt-BR": "America/Sao_Paulo",
+  en: "UTC",
+};
+
+function displayTz(): string {
+  return DISPLAY_TZ[currentLocale()] ?? "UTC";
+}
+
+function dayjsLocale(): string {
+  return currentLocale() === "pt-BR" ? "pt-br" : "en";
+}
 
 /**
  * Centralized locale-aware formatters. Every component should route number,
@@ -60,40 +90,26 @@ export function formatPercent(value: number, digits = 1): string {
   }).format(value);
 }
 
-/** "12/01/2026 08:00 UTC" (pt-BR) or "Jan 12, 2026, 08:00 UTC" (en). */
+/**
+ * Render timestamps in the viewer's display timezone (see DISPLAY_TZ). Bot
+ * stores UTC; dashboard viewers read wall clock. dayjs handles DST transitions
+ * and the short TZ label ("z") so we don't hand-roll the abbreviation. Past
+ * bug: the table said 15:29 while Brazil was at 12:29 because formatters were
+ * pinned to UTC with a hardcoded " UTC" suffix.
+ */
+
+/** e.g. "19/04/2026 12:29 BRT" (pt-BR) / "Apr 19, 2026 3:29 PM UTC" (en). */
 export function formatDateTime(iso: string | Date): string {
-  const d = typeof iso === "string" ? new Date(iso) : iso;
-  return (
-    new Intl.DateTimeFormat(currentLocale(), {
-      dateStyle: "medium",
-      timeStyle: "short",
-      timeZone: "UTC",
-    }).format(d) + " UTC"
-  );
+  return dayjs(iso).tz(displayTz()).locale(dayjsLocale()).format("L LT z");
 }
 
-/** Short date for chart axis ticks — "12 jan" (pt-BR) / "Jan 12" (en). */
+/** Short date for chart axis ticks — "19 de abr." (pt-BR) / "Apr 19" (en). */
 export function formatDateShort(iso: string | Date): string {
-  const d = typeof iso === "string" ? new Date(iso) : iso;
-  return new Intl.DateTimeFormat(currentLocale(), {
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  }).format(d);
+  const fmt = currentLocale() === "pt-BR" ? "DD [de] MMM" : "MMM D";
+  return dayjs(iso).tz(displayTz()).locale(dayjsLocale()).format(fmt);
 }
 
-/** "domingo, 19 de abril de 2026, 08:00 UTC" — used for the "next buy" label. */
+/** "domingo, 26 de abril de 2026, 05:00 BRT" — used for the "next buy" label. */
 export function formatNextBuy(iso: string | Date): string {
-  const d = typeof iso === "string" ? new Date(iso) : iso;
-  return (
-    new Intl.DateTimeFormat(currentLocale(), {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      timeZone: "UTC",
-    }).format(d) + " UTC"
-  );
+  return dayjs(iso).tz(displayTz()).locale(dayjsLocale()).format("LLLL [·] z");
 }
