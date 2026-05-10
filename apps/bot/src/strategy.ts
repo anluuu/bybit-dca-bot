@@ -1,18 +1,13 @@
 import { UnrecoverableError } from "bullmq";
 import { db } from "./db/client.js";
 import { orders, type Asset, type Order } from "./db/schema.js";
-import { eq } from "drizzle-orm";
 import {
-  getTickerPrice,
-  placeLimitOrder,
   placeMarketOrder,
-  cancelOrder,
   getOrderDetail,
   ExchangeClientError,
   ExchangeApiError,
   type OrderDetail,
 } from "./exchange.js";
-import { getInstrumentInfo, roundDownToStep } from "./instrumentInfo.js";
 import { getMonthlySpent } from "./spending.js";
 import {
   ensureSpotBalance,
@@ -22,7 +17,6 @@ import {
   notifySuccess,
   notifyFailure,
   notifyCapReached,
-  notifyFallback,
   notifyInsufficientFunds,
 } from "./notifications.js";
 import { getCompositeSignal, type CompositeSignal } from "./signals/compose.js";
@@ -72,43 +66,17 @@ function recordOrderResult(detail: OrderDetail, pair: string, orderType: string)
 const QUOTE_COIN = "BRL";
 
 /**
- * Place a limit order with pre-flight top-up and a single reactive retry.
+ * Place a market order with pre-flight top-up and a single reactive retry.
  *
  * Pre-flight: ensureSpotBalance pulls from Funding if Spot can't cover
  * `requiredBrl`. Reactive: if Bybit *still* says 170131 (Spot drained between
  * check and place — possible if a human or another bot moves BRL out), one
- * more ensureSpotBalance + placeLimitOrder attempt. If that retry also throws
+ * more ensureSpotBalance + placeMarketOrder attempt. If that retry also throws
  * 170131 the error propagates and the DCA fails normally.
  *
  * `requiredBrl` is the BRL amount the order intends to consume. The wrapper
  * adds a 10% buffer internally via ensureSpotBalance's deficit math.
  */
-async function placeLimitOrderWithRetry(
-  pair: string,
-  qty: string,
-  price: string,
-  requiredBrl: number
-): Promise<string> {
-  const required = requiredBrl * 1.1;
-  await ensureSpotBalance(QUOTE_COIN, required);
-  try {
-    return await placeLimitOrder(pair, qty, price);
-  } catch (error) {
-    if (
-      error instanceof ExchangeClientError &&
-      error.statusCode === 170131
-    ) {
-      logger.warn("Race on insufficient balance — re-topping up and retrying", {
-        pair,
-        requiredBrl,
-      });
-      await ensureSpotBalance(QUOTE_COIN, required);
-      return await placeLimitOrder(pair, qty, price);
-    }
-    throw error;
-  }
-}
-
 async function placeMarketOrderWithRetry(
   pair: string,
   quoteAmount: string,
@@ -154,8 +122,6 @@ export async function executeDca(asset: Asset): Promise<void> {
   const { pair, id: assetId } = asset;
   const buyAmount = parseFloat(asset.buyAmount);
   const monthlyCap = parseFloat(asset.monthlyCap);
-  const limitDiscount = parseFloat(asset.limitDiscount);
-  const limitWaitMins = asset.limitWaitMins;
 
   logger.info("Starting DCA execution", { pair, buyAmount });
 
@@ -167,7 +133,7 @@ export async function executeDca(asset: Asset): Promise<void> {
     await db.insert(orders).values({
       assetId,
       pair,
-      orderType: "limit",
+      orderType: "market",
       status: "skipped_cap",
     });
 
@@ -181,150 +147,17 @@ export async function executeDca(asset: Asset): Promise<void> {
   // getCompositeSignal (graceful fallback tree), so we don't guard here.
   const signal = await getCompositeSignal(pair);
 
-  // 3. Fetch current price
-  let currentPrice: number;
-  try {
-    currentPrice = await getTickerPrice(pair);
-  } catch (error) {
-    if (error instanceof ExchangeClientError) {
-      throw new UnrecoverableError(error.message);
-    }
-    throw error;
-  }
-
-  // 4. Calculate limit order params. Price and qty must match the pair's
-  // exchange-side step sizes (tickSize / basePrecision) — hardcoded decimals
-  // caused prod rejection "Order price has too many decimals" (code 170134)
-  // on 2026-04-19 when the BTCBRL tick widened. Instrument info is cached
-  // for 24h; a miss here falls back to ExchangeApiError → retryable.
-  const instrument = await getInstrumentInfo(pair);
-  const limitPrice = currentPrice * (1 - limitDiscount / 100);
-  const quantity = buyAmount / limitPrice;
-
-  const priceStr = roundDownToStep(limitPrice, instrument.tickSize);
-  const qtyStr = roundDownToStep(quantity, instrument.basePrecision);
-
-  // 5. Place limit order — wrapper pre-tops Spot from Funding if needed and
-  // retries once on a race-induced 170131. InsufficientFundsError surfaces
-  // here for the dedicated Telegram alert before the generic Unrecoverable
-  // catch fires.
-  let limitOrderId: string;
-  try {
-    limitOrderId = await placeLimitOrderWithRetry(
-      pair,
-      qtyStr,
-      priceStr,
-      buyAmount
-    );
-  } catch (error) {
-    if (error instanceof InsufficientFundsError) {
-      await notifyInsufficientFunds(
-        pair,
-        error.available,
-        error.required,
-        error.coin
-      );
-      throw new UnrecoverableError(error.message);
-    }
-    if (error instanceof ExchangeClientError) {
-      throw new UnrecoverableError(error.message);
-    }
-    throw error;
-  }
-
-  // 6. Record pending order (with signal snapshot for dashboard badges).
-  const [insertedOrder] = await db
-    .insert(orders)
-    .values({
-      assetId,
-      pair,
-      orderType: "limit",
-      bybitOrderId: limitOrderId,
-      status: "pending",
-      ...signalColumns(signal),
-    })
-    .returning({ id: orders.id });
-
-  // 7. Poll for limit order fill
-  const pollIntervalMs = 30_000;
-  const maxPolls = Math.ceil((limitWaitMins * 60_000) / pollIntervalMs);
-
-  for (let i = 0; i < maxPolls; i++) {
-    await sleep(pollIntervalMs);
-
-    const detail = await getOrderDetail(pair, limitOrderId);
-
-    if (detail.orderStatus === "Filled") {
-      await db
-        .update(orders)
-        .set({
-          status: "filled",
-          price: detail.avgPrice,
-          quantity: detail.cumExecQty,
-          fiatSpent: parseFloat(detail.cumExecValue).toFixed(2),
-          fee: detail.cumExecFee,
-          feeCurrency: detail.feeCurrency,
-        })
-        .where(eq(orders.id, insertedOrder.id));
-
-      await notifySuccess(recordOrderResult(detail, pair, "limit"));
-      logger.info("Limit order filled", { pair, orderId: limitOrderId });
-      return;
-    }
-
-    // Handle external cancellation or rejection
-    if (
-      detail.orderStatus === "Cancelled" ||
-      detail.orderStatus === "Rejected" ||
-      detail.orderStatus === "PartiallyFilledCanceled"
-    ) {
-      logger.warn("Limit order ended externally", {
-        pair,
-        orderId: limitOrderId,
-        status: detail.orderStatus,
-      });
-
-      await db
-        .update(orders)
-        .set({ status: "cancelled" })
-        .where(eq(orders.id, insertedOrder.id));
-
-      break;
-    }
-
-    logger.info("Polling limit order", {
-      pair,
-      orderId: limitOrderId,
-      poll: i + 1,
-      maxPolls,
-      status: detail.orderStatus,
-    });
-  }
-
-  // 8. Limit order not filled — cancel and fallback to market
-  logger.info("Limit order not filled, falling back to market", {
-    pair,
-    orderId: limitOrderId,
-  });
-
-  try {
-    await cancelOrder(pair, limitOrderId);
-  } catch {
-    logger.warn("Cancel order failed (may already be cancelled)", {
-      pair,
-      orderId: limitOrderId,
-    });
-  }
-
-  // Update limit order row if still pending (timeout case)
-  await db
-    .update(orders)
-    .set({ status: "cancelled" })
-    .where(eq(orders.id, insertedOrder.id));
-
-  await notifyFallback(pair, limitOrderId);
-
-  // 9. Place market order via wrapper (same auto-topup + retry as limit).
+  // 3. Place market order via wrapper (auto-topup Funding→Spot if needed,
+  // single reactive retry on a race-induced 170131).
+  //
+  // Previously the strategy started with a limit order at `lastPrice × (1 −
+  // limitDiscount)`, polled for `limitWaitMins`, then fell back to market.
+  // On BTCBRL the limit price almost always landed below the best bid (low
+  // Sunday-morning liquidity, ~0.2% spread), so every cycle since 2026-04-26
+  // ended in the market fallback anyway. Skipping the limit step removes
+  // the 2-hour stall, the cancelled-row + notifyFallback noise, and a class
+  // of mid-flight failure modes (cancel races, tick-size rejections), with
+  // no measurable loss in fill price for a 250-BRL clip on this pair.
   let marketOrderId: string;
   try {
     marketOrderId = await placeMarketOrderWithRetry(
@@ -348,7 +181,7 @@ export async function executeDca(asset: Asset): Promise<void> {
     throw error;
   }
 
-  // 10. Poll market order with retries (not just a single sleep)
+  // 4. Poll market order with retries (not just a single sleep)
   const marketDetail = await waitForOrderFill(pair, marketOrderId, 5, 2_000);
 
   const isFilled =
@@ -372,10 +205,7 @@ export async function executeDca(asset: Asset): Promise<void> {
 
   if (isFilled) {
     await notifySuccess(recordOrderResult(marketDetail, pair, "market"));
-    logger.info("Market fallback order filled", {
-      pair,
-      orderId: marketOrderId,
-    });
+    logger.info("Market order filled", { pair, orderId: marketOrderId });
   } else {
     const errorMsg = `Market order not filled: orderStatus=${marketDetail.orderStatus}`;
     await notifyFailure(errorMsg, pair);
