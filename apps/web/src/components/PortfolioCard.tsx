@@ -77,8 +77,13 @@ export function PortfolioCard({ pnl }: PortfolioCardProps) {
         <span className="text-xs text-surface-400">{t("portfolio.pnl")}</span>
       </div>
 
-      {/* Stats row: ROI | avg cost | avg vs spot */}
-      <div className="grid grid-cols-3 gap-3 pt-4 border-t border-surface-700/30">
+      {/* Stats row: ROI | avg cost.
+        avgVsSpotPct is mathematically identical to roiPct given a
+        volume-weighted avgPrice (totalSpent / totalBtc = avgPrice ⇒
+        (price − avgPrice) / avgPrice = (portValue − spent) / spent), so
+        showing both was redundant. Kept in PortfolioPnl wire type for
+        external consumers; just not rendered. */}
+      <div className="grid grid-cols-2 gap-3 pt-4 border-t border-surface-700/30">
         <MiniStat
           label={t("portfolio.roi")}
           value={formatSignedPct(pnl.roiPct)}
@@ -89,11 +94,6 @@ export function PortfolioCard({ pnl }: PortfolioCardProps) {
           value={
             pnl.avgPrice > 0 ? formatCurrencyCompact(pnl.avgPrice) : "—"
           }
-        />
-        <MiniStat
-          label={t("portfolio.avgVsSpot")}
-          value={formatSignedPct(pnl.avgVsSpotPct)}
-          colorValue={pnl.avgVsSpotPct}
         />
       </div>
     </div>
