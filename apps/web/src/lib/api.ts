@@ -18,5 +18,6 @@ export type {
   PublicOrdersPage,
   PublicStatus,
   PublicSignals,
+  PortfolioPnl,
   SignalFallback,
 } from "@dca/shared";
