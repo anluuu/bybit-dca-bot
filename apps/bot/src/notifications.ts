@@ -182,3 +182,57 @@ export function notifyFallback(
     await send(msg);
   });
 }
+
+export function notifyTransfer(
+  amount: number,
+  coin: string,
+  transferId: string
+): Promise<void> {
+  return safeAsync(async () => {
+    const amountStr = escapeMarkdown(
+      amount.toLocaleString("pt-BR", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })
+    );
+    const coinStr = escapeMarkdown(coin);
+    const idStr = escapeMarkdown(transferId);
+    const msg =
+      `*Funds Topped Up*\n\n` +
+      `*Amount:* ${amountStr} ${coinStr}\n` +
+      `*Direction:* Funding → Spot\n` +
+      `*Transfer ID:* ${idStr}`;
+    await send(msg);
+  });
+}
+
+export function notifyInsufficientFunds(
+  pair: string,
+  available: number,
+  required: number,
+  coin: string
+): Promise<void> {
+  return safeAsync(async () => {
+    const pairStr = escapeMarkdown(pair);
+    const coinStr = escapeMarkdown(coin);
+    const availStr = escapeMarkdown(
+      available.toLocaleString("pt-BR", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })
+    );
+    const reqStr = escapeMarkdown(
+      required.toLocaleString("pt-BR", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })
+    );
+    const msg =
+      `*⚠️ INSUFFICIENT FUNDS*\n\n` +
+      `*Pair:* ${pairStr}\n` +
+      `*Available:* ${availStr} ${coinStr} \\(Spot \\+ Funding\\)\n` +
+      `*Required:* ${reqStr} ${coinStr}\n\n` +
+      `Deposit ${coinStr} to Bybit and retry via *Run now*\\.`;
+    await send(msg);
+  });
+}
