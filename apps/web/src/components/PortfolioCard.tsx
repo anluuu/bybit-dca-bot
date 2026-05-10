@@ -21,7 +21,7 @@ function formatSignedPct(value: number | null): string {
 
 function colorClass(value: number | null): string {
   if (value === null || value === 0) return "text-surface-400";
-  return value > 0 ? "text-emerald-400" : "text-red-400";
+  return value > 0 ? "text-green-gain" : "text-red-loss";
 }
 
 export function PortfolioCard({ pnl }: PortfolioCardProps) {
