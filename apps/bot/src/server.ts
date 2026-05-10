@@ -18,8 +18,9 @@ import { executeDca, executeTestOrder } from "./strategy.js";
 import { notifyFailure, notifyPing } from "./notifications.js";
 import { getTickerPrice, ExchangeClientError } from "./exchange.js";
 import { getMonthlySpent } from "./spending.js";
+import { getPrice } from "./priceCache.js";
 import { getCompositeSignal } from "./signals/compose.js";
-import type { AdminRunNowResult, PublicSignals } from "@dca/shared";
+import type { AdminRunNowResult, PortfolioPnl, PublicSignals } from "@dca/shared";
 
 const startTime = Date.now();
 
@@ -427,6 +428,81 @@ export async function startServer(redisConnection: Redis) {
         generatedAt: signal.generatedAt,
       };
       return payload;
+    }
+  );
+
+  app.get(
+    "/api/public/pnl",
+    { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } },
+    async (request, reply) => {
+      const querySchema = z.object({
+        pair: z.string().min(1).max(20).optional(),
+      });
+      const parsed = querySchema.safeParse(request.query);
+      if (!parsed.success) {
+        return reply.status(400).send({ error: "Invalid query params" });
+      }
+
+      const [firstAsset] = await db.select().from(assets).limit(1);
+      if (!firstAsset) {
+        return reply.status(404).send({ error: "No asset configured" });
+      }
+      const pair = parsed.data.pair ?? firstAsset.pair;
+
+      // Reuse the same predicate as /api/public/summary: filled & non-test.
+      const [agg] = await db
+        .select({
+          totalBtc: sql<string>`COALESCE(SUM(${orders.quantity}), 0)`,
+          totalSpent: sql<string>`COALESCE(SUM(${orders.fiatSpent}), 0)`,
+          avgPrice: sql<string>`COALESCE(
+            SUM(${orders.fiatSpent}) / NULLIF(SUM(${orders.quantity}), 0),
+            0
+          )`,
+        })
+        .from(orders)
+        .where(
+          sql`${orders.status} = 'filled'
+            AND ${orders.isTest} = false
+            AND ${orders.pair} = ${pair}`
+        );
+
+      const totalBtc = parseFloat(agg.totalBtc);
+      const totalSpent = parseFloat(agg.totalSpent);
+      const avgPrice = parseFloat(agg.avgPrice);
+
+      const priceLookup = await getPrice(pair);
+      const currentPrice = priceLookup.price;
+
+      const portfolioValue =
+        currentPrice !== null ? currentPrice * totalBtc : null;
+      const unrealizedPnl =
+        portfolioValue !== null && totalBtc > 0
+          ? portfolioValue - totalSpent
+          : null;
+      const roiPct =
+        unrealizedPnl !== null && totalSpent > 0
+          ? (unrealizedPnl / totalSpent) * 100
+          : null;
+      const avgVsSpotPct =
+        currentPrice !== null && avgPrice > 0
+          ? ((currentPrice - avgPrice) / avgPrice) * 100
+          : null;
+
+      const body: PortfolioPnl = {
+        pair,
+        currentPrice,
+        priceAsOf: priceLookup.fetchedAt,
+        priceStale: priceLookup.stale,
+        totalBtc,
+        totalSpent,
+        avgPrice,
+        portfolioValue,
+        unrealizedPnl,
+        roiPct,
+        avgVsSpotPct,
+        generatedAt: new Date().toISOString(),
+      };
+      return body;
     }
   );
 
