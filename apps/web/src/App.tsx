@@ -9,6 +9,7 @@ import { useTranslation } from "react-i18next";
 import { Bitcoin, LogIn, LogOut, Eye, AlertTriangle } from "lucide-react";
 import { StatusCard } from "./components/StatusCard.tsx";
 import { SpendingCard } from "./components/SpendingCard.tsx";
+import { PortfolioCard } from "./components/PortfolioCard.tsx";
 import { SignalsPanel } from "./components/SignalsPanel.tsx";
 import { AccumulationChart } from "./components/AccumulationChart.tsx";
 import { MonthlyOverview } from "./components/MonthlyOverview.tsx";
@@ -30,6 +31,7 @@ import type {
   HealthStatus,
   ChartPoint,
   MonthlyBreakdown,
+  PortfolioPnl,
   PublicMonthlyBreakdown,
   PublicOrdersPage,
   PublicStatus,
@@ -102,6 +104,19 @@ function useSummary() {
       if (!res.ok) throw new Error(`Failed to load summary (${res.status})`);
       return res.json();
     },
+  });
+}
+
+function usePnl() {
+  return useQuery<PortfolioPnl>({
+    queryKey: ["pnl"],
+    queryFn: async () => {
+      const res = await fetch("/api/public/pnl", { credentials: "include" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    },
+    refetchInterval: 60_000,
+    retry: 2,
   });
 }
 
@@ -242,6 +257,7 @@ function AdminDashboard() {
   const { data: assets, error: assetsError } = useAssets();
   const { data: summary, error: summaryError } = useSummary();
   const { data: monthly, error: monthlyError } = useMonthly();
+  const { data: pnl } = usePnl();
   const { data: health } = useHealth();
   // Signals are non-critical — if the market-data fetch fails the rest of the
   // dashboard still renders. Shared with the public dashboard (same endpoint).
@@ -285,9 +301,10 @@ function AdminDashboard() {
       {apiError && <ErrorBanner message={apiError.message} />}
 
       {summary && health && (
-        <div className="mb-6 grid gap-6 md:grid-cols-2">
+        <div className="mb-6 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
           <StatusCard health={health} asset={assets?.[0]} />
           <SpendingCard summary={summary} />
+          {pnl && <PortfolioCard pnl={pnl} />}
         </div>
       )}
 
@@ -352,6 +369,7 @@ function PublicDashboard() {
   const { data: ordersPage } = usePublicOrders(page);
   const { data: status } = usePublicStatus();
   const { data: signals } = usePublicSignals();
+  const { data: pnl } = usePnl();
   const { data: health } = useHealth();
 
   return (
@@ -393,9 +411,10 @@ function PublicDashboard() {
       </header>
 
       {summary && health && (
-        <div className="mb-6 grid gap-6 md:grid-cols-2">
+        <div className="mb-6 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
           <StatusCard health={health} asset={status} />
           <SpendingCard summary={summary} />
+          {pnl && <PortfolioCard pnl={pnl} />}
         </div>
       )}
 
