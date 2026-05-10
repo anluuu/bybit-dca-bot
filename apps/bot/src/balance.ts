@@ -29,7 +29,7 @@ export interface EnsureResult {
 // Module-level coalescing lock: if two concurrent code paths (e.g. a scheduled
 // DCA racing a manual run-now) both ask to ensure the same coin's Spot
 // balance, the second caller awaits the first's Promise instead of launching
-// a second transfer. Mirrors the pattern in priceCache.ts.
+// a second transfer.
 const inflight = new Map<string, Promise<EnsureResult>>();
 
 export async function ensureSpotBalance(
@@ -59,7 +59,23 @@ export async function ensureSpotBalance(
       const targetAmount = deficit * 1.1;
       const transferAmount = Math.min(targetAmount, funding);
 
-      const { transferId } = await transferFundingToSpot(coin, transferAmount);
+      let transferId: string;
+      try {
+        ({ transferId } = await transferFundingToSpot(coin, transferAmount));
+      } catch (error) {
+        // Bybit can still return 170131 on the transfer itself if Funding
+        // actually held less than getFundingBalance reported (e.g. a manual
+        // withdrawal raced our pre-check). Translate to InsufficientFundsError
+        // so the strategy layer can fire the dedicated critical Telegram alert
+        // instead of swallowing this as a generic ExchangeClientError.
+        if (
+          error instanceof ExchangeClientError &&
+          error.statusCode === 170131
+        ) {
+          throw new InsufficientFundsError(spot + funding, required, coin);
+        }
+        throw error;
+      }
 
       logger.info("Auto-transfer Funding→Spot", {
         coin,
