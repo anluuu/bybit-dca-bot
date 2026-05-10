@@ -241,3 +241,33 @@ export interface PublicSignals {
   fallback: SignalFallback;
   generatedAt: string;
 }
+
+/**
+ * Snapshot of unrealized PnL on the primary trading pair, served by
+ * GET /api/public/pnl. Combines the already-public summary aggregates
+ * (totalSpent, totalBtc, avgPrice) with the current Bybit spot price.
+ *
+ * The bot does NOT change behavior based on this data — it is purely a
+ * dashboard indicator. `priceStale` flags when the ticker fetch is
+ * failing and the values use a cached older price.
+ */
+export interface PortfolioPnl {
+  pair: string;
+  currentPrice: number | null;
+  /** ISO timestamp of when currentPrice was fetched from Bybit. */
+  priceAsOf: string;
+  /** true when the ticker fetch failed and we are serving a cached older price. */
+  priceStale: boolean;
+  totalBtc: number;
+  totalSpent: number;
+  avgPrice: number;
+  /** currentPrice × totalBtc. null when currentPrice is null. */
+  portfolioValue: number | null;
+  /** portfolioValue − totalSpent. null when currentPrice is null or totalBtc is 0. */
+  unrealizedPnl: number | null;
+  /** unrealizedPnl / totalSpent × 100. null when totalSpent is 0 or currentPrice is null. */
+  roiPct: number | null;
+  /** (currentPrice − avgPrice) / avgPrice × 100. null when avgPrice is 0 or currentPrice is null. */
+  avgVsSpotPct: number | null;
+  generatedAt: string;
+}
