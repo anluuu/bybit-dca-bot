@@ -52,6 +52,17 @@ export const ptBR = {
     totalBtc: "Total em BTC",
     avgPrice: "Preço médio",
   },
+  portfolio: {
+    title: "Portfólio",
+    value: "Valor",
+    pnl: "L/P não realizado",
+    roi: "Retorno",
+    avgCost: "Preço médio",
+    avgVsSpot: "Médio vs spot",
+    priceStale: "Preço de {{when}}",
+    priceUnavailable: "Preço indisponível",
+    noData: "Sem compras ainda",
+  },
   orders: {
     purchaseHistory: "Histórico de compras",
     count_one: "{{count}} ordem",
