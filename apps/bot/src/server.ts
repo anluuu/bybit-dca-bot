@@ -224,7 +224,10 @@ export async function startServer(redisConnection: Redis) {
         totalOrders: sql<string>`COUNT(*)`,
         totalBtc: sql<string>`COALESCE(SUM(${orders.quantity}), 0)`,
         totalSpent: sql<string>`COALESCE(SUM(${orders.fiatSpent}), 0)`,
-        avgPrice: sql<string>`COALESCE(AVG(${orders.price}), 0)`,
+        avgPrice: sql<string>`COALESCE(
+          SUM(${orders.fiatSpent}) / NULLIF(SUM(${orders.quantity}), 0),
+          0
+        )`,
       })
       .from(orders)
       .where(sql`${orders.status} = 'filled' AND ${orders.isTest} = false`);
@@ -597,7 +600,10 @@ export async function startServer(redisConnection: Redis) {
         totalOrders: sql<string>`COUNT(*)`,
         totalBtc: sql<string>`COALESCE(SUM(${orders.quantity}), 0)`,
         totalSpent: sql<string>`COALESCE(SUM(${orders.fiatSpent}), 0)`,
-        avgPrice: sql<string>`COALESCE(AVG(${orders.price}), 0)`,
+        avgPrice: sql<string>`COALESCE(
+          SUM(${orders.fiatSpent}) / NULLIF(SUM(${orders.quantity}), 0),
+          0
+        )`,
       })
       .from(orders)
       .where(sql`${orders.status} = 'filled' AND ${orders.isTest} = false`);
