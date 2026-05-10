@@ -15,10 +15,15 @@ import {
 import { getInstrumentInfo, roundDownToStep } from "./instrumentInfo.js";
 import { getMonthlySpent } from "./spending.js";
 import {
+  ensureSpotBalance,
+  InsufficientFundsError,
+} from "./balance.js";
+import {
   notifySuccess,
   notifyFailure,
   notifyCapReached,
   notifyFallback,
+  notifyInsufficientFunds,
 } from "./notifications.js";
 import { getCompositeSignal, type CompositeSignal } from "./signals/compose.js";
 import { logger } from "./logger.js";
@@ -62,6 +67,71 @@ function recordOrderResult(detail: OrderDetail, pair: string, orderType: string)
     fee: parseFloat(detail.cumExecFee),
     feeCurrency: detail.feeCurrency,
   };
+}
+
+const QUOTE_COIN = "BRL";
+
+/**
+ * Place a limit order with pre-flight top-up and a single reactive retry.
+ *
+ * Pre-flight: ensureSpotBalance pulls from Funding if Spot can't cover
+ * `requiredBrl`. Reactive: if Bybit *still* says 170131 (Spot drained between
+ * check and place — possible if a human or another bot moves BRL out), one
+ * more ensureSpotBalance + placeLimitOrder attempt. If that retry also throws
+ * 170131 the error propagates and the DCA fails normally.
+ *
+ * `requiredBrl` is the BRL amount the order intends to consume. The wrapper
+ * adds a 10% buffer internally via ensureSpotBalance's deficit math.
+ */
+async function placeLimitOrderWithRetry(
+  pair: string,
+  qty: string,
+  price: string,
+  requiredBrl: number
+): Promise<string> {
+  const required = requiredBrl * 1.1;
+  await ensureSpotBalance(QUOTE_COIN, required);
+  try {
+    return await placeLimitOrder(pair, qty, price);
+  } catch (error) {
+    if (
+      error instanceof ExchangeClientError &&
+      error.statusCode === 170131
+    ) {
+      logger.warn("Race on insufficient balance — re-topping up and retrying", {
+        pair,
+        requiredBrl,
+      });
+      await ensureSpotBalance(QUOTE_COIN, required);
+      return await placeLimitOrder(pair, qty, price);
+    }
+    throw error;
+  }
+}
+
+async function placeMarketOrderWithRetry(
+  pair: string,
+  quoteAmount: string,
+  requiredBrl: number
+): Promise<string> {
+  const required = requiredBrl * 1.1;
+  await ensureSpotBalance(QUOTE_COIN, required);
+  try {
+    return await placeMarketOrder(pair, quoteAmount);
+  } catch (error) {
+    if (
+      error instanceof ExchangeClientError &&
+      error.statusCode === 170131
+    ) {
+      logger.warn("Race on insufficient balance — re-topping up and retrying", {
+        pair,
+        requiredBrl,
+      });
+      await ensureSpotBalance(QUOTE_COIN, required);
+      return await placeMarketOrder(pair, quoteAmount);
+    }
+    throw error;
+  }
 }
 
 /**
@@ -134,11 +204,28 @@ export async function executeDca(asset: Asset): Promise<void> {
   const priceStr = roundDownToStep(limitPrice, instrument.tickSize);
   const qtyStr = roundDownToStep(quantity, instrument.basePrecision);
 
-  // 5. Place limit order
+  // 5. Place limit order — wrapper pre-tops Spot from Funding if needed and
+  // retries once on a race-induced 170131. InsufficientFundsError surfaces
+  // here for the dedicated Telegram alert before the generic Unrecoverable
+  // catch fires.
   let limitOrderId: string;
   try {
-    limitOrderId = await placeLimitOrder(pair, qtyStr, priceStr);
+    limitOrderId = await placeLimitOrderWithRetry(
+      pair,
+      qtyStr,
+      priceStr,
+      buyAmount
+    );
   } catch (error) {
+    if (error instanceof InsufficientFundsError) {
+      await notifyInsufficientFunds(
+        pair,
+        error.available,
+        error.required,
+        error.coin
+      );
+      throw new UnrecoverableError(error.message);
+    }
     if (error instanceof ExchangeClientError) {
       throw new UnrecoverableError(error.message);
     }
@@ -237,11 +324,24 @@ export async function executeDca(asset: Asset): Promise<void> {
 
   await notifyFallback(pair, limitOrderId);
 
-  // 9. Place market order
+  // 9. Place market order via wrapper (same auto-topup + retry as limit).
   let marketOrderId: string;
   try {
-    marketOrderId = await placeMarketOrder(pair, buyAmount.toFixed(2));
+    marketOrderId = await placeMarketOrderWithRetry(
+      pair,
+      buyAmount.toFixed(2),
+      buyAmount
+    );
   } catch (error) {
+    if (error instanceof InsufficientFundsError) {
+      await notifyInsufficientFunds(
+        pair,
+        error.available,
+        error.required,
+        error.coin
+      );
+      throw new UnrecoverableError(error.message);
+    }
     if (error instanceof ExchangeClientError) {
       throw new UnrecoverableError(error.message);
     }
@@ -286,8 +386,13 @@ export async function executeDca(asset: Asset): Promise<void> {
 /**
  * Execute a small *test* market order. Tagged is_test=true so it's excluded
  * from monthly-cap accounting and public/admin summary aggregates. Does NOT
- * send Telegram notifications — this is an admin-triggered sanity check, not
- * a real DCA event.
+ * send Telegram fill/failure notifications — this is an admin-triggered
+ * sanity check, not a real DCA event. The auto-transfer layer
+ * (placeMarketOrderWithRetry → ensureSpotBalance) can still emit a
+ * "Funds Topped Up" info message when a Funding→Spot top-up happens, and an
+ * InsufficientFundsError on the test path fires the critical
+ * notifyInsufficientFunds alert (operators want to know BEFORE the next
+ * scheduled DCA hits the same wall).
  *
  * Always uses a market order (no limit fallback) so feedback is immediate.
  * The caller is expected to have already checked for in-flight orders on the
@@ -302,7 +407,11 @@ export async function executeTestOrder(
 
   let marketOrderId: string;
   try {
-    marketOrderId = await placeMarketOrder(pair, amountBrl.toFixed(2));
+    marketOrderId = await placeMarketOrderWithRetry(
+      pair,
+      amountBrl.toFixed(2),
+      amountBrl
+    );
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     const [failedRow] = await db
@@ -316,6 +425,18 @@ export async function executeTestOrder(
         isTest: true,
       })
       .returning();
+
+    if (error instanceof InsufficientFundsError) {
+      // Test orders fire a critical alert too — operators want to know
+      // BEFORE the next scheduled DCA hits the same wall.
+      await notifyInsufficientFunds(
+        pair,
+        error.available,
+        error.required,
+        error.coin
+      );
+      return failedRow;
+    }
 
     if (
       error instanceof ExchangeClientError ||
