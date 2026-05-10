@@ -299,7 +299,11 @@ export async function getSpotBalance(coin: string): Promise<number> {
     const { data } = await client.get<
       BybitResponse<{
         list: Array<{
-          coin: Array<{ coin: string; availableToWithdraw: string }>;
+          coin: Array<{
+            coin: string;
+            walletBalance: string | null;
+            availableToWithdraw: string | null;
+          }>;
         }>;
       }>
     >("/v5/account/wallet-balance", {
@@ -310,7 +314,16 @@ export async function getSpotBalance(coin: string): Promise<number> {
     const coinData = result.list[0]?.coin?.find(
       (c) => c.coin === coin
     );
-    const balance = coinData ? parseFloat(coinData.availableToWithdraw) : 0;
+    // Trade-balance check, not a withdrawal. `availableToWithdraw` can be
+    // null right after a deposit/transfer because of Bybit's anti-fraud
+    // lockup (seen with BRL after PIX/inter-account moves), while
+    // `walletBalance` reflects the true tradable balance. `parseFloat(null)`
+    // returns NaN, which silently broke the ensureSpotBalance math —
+    // NaN >= required is false, NaN + funding < required is also false,
+    // and a NaN transferAmount made Bybit reject with code 131203.
+    const rawBalance = coinData?.walletBalance ?? coinData?.availableToWithdraw;
+    const parsed = rawBalance != null ? parseFloat(rawBalance) : 0;
+    const balance = Number.isFinite(parsed) ? parsed : 0;
     logger.info("Fetched balance", { coin, balance });
     return balance;
   } catch (error) {
@@ -335,7 +348,9 @@ export async function getFundingBalance(coin: string): Promise<number> {
 
     const result = handleResponse(data, "getFundingBalance");
     const raw = result.balance?.walletBalance;
-    const balance = raw ? parseFloat(raw) : 0;
+    const parsed = raw ? parseFloat(raw) : 0;
+    // Guard against NaN slipping through into ensureSpotBalance's math.
+    const balance = Number.isFinite(parsed) ? parsed : 0;
     logger.info("Fetched funding balance", { coin, balance });
     return balance;
   } catch (error) {

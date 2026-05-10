@@ -43,13 +43,19 @@ export async function ensureSpotBalance(
 
   const work = (async (): Promise<EnsureResult> => {
     try {
-      const spot = await getSpotBalance(coin);
+      const rawSpot = await getSpotBalance(coin);
+      // Belt-and-suspenders: getSpotBalance / getFundingBalance already
+      // coerce non-finite values to 0, but guard here too so NaN cannot
+      // sneak past the comparisons below and reach transferFundingToSpot
+      // with a NaN amount (Bybit rejects with 131203).
+      const spot = Number.isFinite(rawSpot) ? rawSpot : 0;
       if (spot >= required) {
         return { transferred: false };
       }
 
       const deficit = required - spot;
-      const funding = await getFundingBalance(coin);
+      const rawFunding = await getFundingBalance(coin);
+      const funding = Number.isFinite(rawFunding) ? rawFunding : 0;
 
       if (spot + funding < required) {
         throw new InsufficientFundsError(spot + funding, required, coin);
