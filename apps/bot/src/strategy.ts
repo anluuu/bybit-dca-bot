@@ -386,8 +386,13 @@ export async function executeDca(asset: Asset): Promise<void> {
 /**
  * Execute a small *test* market order. Tagged is_test=true so it's excluded
  * from monthly-cap accounting and public/admin summary aggregates. Does NOT
- * send Telegram notifications — this is an admin-triggered sanity check, not
- * a real DCA event.
+ * send Telegram fill/failure notifications — this is an admin-triggered
+ * sanity check, not a real DCA event. The auto-transfer layer
+ * (placeMarketOrderWithRetry → ensureSpotBalance) can still emit a
+ * "Funds Topped Up" info message when a Funding→Spot top-up happens, and an
+ * InsufficientFundsError on the test path fires the critical
+ * notifyInsufficientFunds alert (operators want to know BEFORE the next
+ * scheduled DCA hits the same wall).
  *
  * Always uses a market order (no limit fallback) so feedback is immediate.
  * The caller is expected to have already checked for in-flight orders on the
