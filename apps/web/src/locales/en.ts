@@ -48,6 +48,17 @@ export const en: Translations = {
     totalBtc: "Total BTC",
     avgPrice: "Avg Price",
   },
+  portfolio: {
+    title: "Portfolio",
+    value: "Value",
+    pnl: "Unrealized P&L",
+    roi: "ROI",
+    avgCost: "Avg cost",
+    avgVsSpot: "Avg vs spot",
+    priceStale: "Price as of {{when}}",
+    priceUnavailable: "Price unavailable",
+    noData: "No buys yet",
+  },
   orders: {
     purchaseHistory: "Purchase History",
     count_one: "{{count}} order",
