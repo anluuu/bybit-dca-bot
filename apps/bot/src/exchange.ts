@@ -324,3 +324,28 @@ export async function getSpotBalance(coin: string): Promise<number> {
     );
   }
 }
+
+export async function getFundingBalance(coin: string): Promise<number> {
+  try {
+    const { data } = await client.get<
+      BybitResponse<{ balance: { walletBalance: string | null } }>
+    >("/v5/asset/transfer/query-account-coin-balance", {
+      params: { accountType: "FUND", coin },
+    });
+
+    const result = handleResponse(data, "getFundingBalance");
+    const raw = result.balance?.walletBalance;
+    const balance = raw ? parseFloat(raw) : 0;
+    logger.info("Fetched funding balance", { coin, balance });
+    return balance;
+  } catch (error) {
+    if (
+      error instanceof ExchangeApiError ||
+      error instanceof ExchangeClientError
+    )
+      throw error;
+    throw new ExchangeApiError(
+      `getFundingBalance failed: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
