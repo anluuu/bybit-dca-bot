@@ -349,3 +349,46 @@ export async function getFundingBalance(coin: string): Promise<number> {
     );
   }
 }
+
+export async function transferFundingToSpot(
+  coin: string,
+  amount: number
+): Promise<{ transferId: string }> {
+  // Bybit dedupes inter-account transfers by transferId for ~24h. Generate
+  // fresh per call — a retry of the parent DCA job will get a new UUID, but
+  // by then the previous transfer (if it actually settled server-side) has
+  // already topped up Spot, so the second call short-circuits at the
+  // getSpotBalance pre-check in ensureSpotBalance.
+  const transferId = crypto.randomUUID();
+  const body = {
+    transferId,
+    coin,
+    amount: amount.toFixed(2),
+    fromAccountType: "FUND",
+    toAccountType: "UNIFIED",
+  };
+
+  try {
+    const { data } = await client.post<
+      BybitResponse<{ transferId: string; status: string }>
+    >("/v5/asset/transfer/inter-transfer", body);
+
+    const result = handleResponse(data, "transferFundingToSpot");
+    logger.info("Transferred funds", {
+      coin,
+      amount: body.amount,
+      transferId: result.transferId,
+      status: result.status,
+    });
+    return { transferId: result.transferId };
+  } catch (error) {
+    if (
+      error instanceof ExchangeApiError ||
+      error instanceof ExchangeClientError
+    )
+      throw error;
+    throw new ExchangeApiError(
+      `transferFundingToSpot failed: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
