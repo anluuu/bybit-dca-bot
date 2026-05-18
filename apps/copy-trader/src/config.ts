@@ -7,6 +7,12 @@ const configSchema = z.object({
   TELEGRAM_SESSION_STRING: z.string().min(1),
   SIGNAL_CHANNEL_ID: z.coerce.number().int(),
 
+  // Optional Telegram forum topic id. When set, only messages posted inside
+  // this topic are ingested. Use it when the source is a Telegram supergroup
+  // with topics (forum) — e.g. "Grupo VIP" → topic "Sinais". Leave empty to
+  // ingest from the whole channel.
+  SIGNAL_TOPIC_ID: z.coerce.number().int().optional(),
+
   // Telegram notification bot (separate, telegraf)
   TELEGRAM_NOTIFY_BOT_TOKEN: z.string().min(1),
   TELEGRAM_NOTIFY_CHAT_ID: z.string().min(1),

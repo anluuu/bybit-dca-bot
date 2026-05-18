@@ -21,7 +21,14 @@ export async function reconcileRecentMessages(client: TelegramClient): Promise<v
 
   logger.info("Boot reconcile starting", { limit });
   try {
-    const messages = await client.getMessages(config.SIGNAL_CHANNEL_ID, { limit });
+    // When a topic is configured, fetch messages from that thread only. gramjs
+    // accepts `replyTo` (alias for top_msg_id) as a filter.
+    const messages = await client.getMessages(config.SIGNAL_CHANNEL_ID, {
+      limit,
+      ...(config.SIGNAL_TOPIC_ID != null
+        ? { replyTo: config.SIGNAL_TOPIC_ID }
+        : {}),
+    });
     const ingestable = messages.filter(
       (msg): msg is Api.Message =>
         msg instanceof Api.Message && typeof msg.message === "string" && msg.message.length > 0

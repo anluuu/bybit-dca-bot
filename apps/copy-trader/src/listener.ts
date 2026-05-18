@@ -65,7 +65,27 @@ async function handleEvent(event: NewMessageEvent): Promise<void> {
     logger.warn("Skipping non-text message", { msgId });
     return;
   }
+  if (!isInTargetTopic(msg)) {
+    return; // wrong topic; silent to avoid log spam
+  }
   await ingestSignalText(text, msgId, senderId);
+}
+
+/**
+ * When SIGNAL_TOPIC_ID is configured, accept only messages whose reply chain
+ * places them inside that forum topic. Telegram represents forum messages
+ * with a MessageReplyHeader where either replyToTopId (replies inside the
+ * topic) or replyToMsgId (the initial post of the topic) carries the topic's
+ * root message id. Unset env = passthrough.
+ */
+function isInTargetTopic(msg: { replyTo?: unknown }): boolean {
+  if (config.SIGNAL_TOPIC_ID == null) return true;
+  const rt = msg.replyTo as
+    | { replyToTopId?: number; replyToMsgId?: number; forumTopic?: boolean }
+    | undefined;
+  if (!rt) return false;
+  const top = rt.replyToTopId ?? rt.replyToMsgId;
+  return top === config.SIGNAL_TOPIC_ID;
 }
 
 /**
