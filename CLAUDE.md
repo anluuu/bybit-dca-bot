@@ -64,6 +64,30 @@ A single Node.js service (`apps/bot/src/index.ts`) boots in this order: validate
 
 ---
 
+## Where things live — `apps/copy-trader` (F0)
+
+| What | Where |
+|------|-------|
+| Boot sequence | `apps/copy-trader/src/index.ts` |
+| Env schema (Zod) | `apps/copy-trader/src/config.ts` |
+| Structured logger | `apps/copy-trader/src/logger.ts` |
+| Telegram session bootstrap CLI | `apps/copy-trader/src/scripts/auth.ts` (run via `pnpm --filter @dca/copy-trader auth`) |
+| MTProto listener (gramjs) | `apps/copy-trader/src/listener.ts` |
+| Signal parser (regex + Zod) | `apps/copy-trader/src/parser.ts` |
+| Parser tests (Vitest) | `apps/copy-trader/src/parser.test.ts` |
+| Boot reconcile (last N msgs) | `apps/copy-trader/src/recovery.ts` |
+| HTTP server (Fastify) | `apps/copy-trader/src/server.ts` |
+| Notifier (telegraf) | `apps/copy-trader/src/notifications.ts` |
+| DB schema (Drizzle) | `apps/copy-trader/src/db/schema.ts` |
+| DB migrate runner | `apps/copy-trader/src/db/migrate.ts` |
+| Postgres schema | `copy_trader` (same instance as bot) |
+
+**F0 scope:** listener + parser only. No trade execution. F1 (dry-run + risk gate + watcher) and F2 (live trading on Bybit perp) are separate plans authored after F0 has run in production and parser quality is validated.
+
+**Telegram session is a full-account credential** — generated locally via `pnpm --filter @dca/copy-trader auth`, pasted into Dokploy as `COPY_TG_SESSION_STRING`, never committed.
+
+---
+
 ## The shared package boundary
 
 `@dca/shared` contains **only TypeScript types** that describe the JSON wire format between the bot's API and the web frontend. It has zero runtime dependencies.
