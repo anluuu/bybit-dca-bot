@@ -1,6 +1,8 @@
 import { SignalsTable } from "../components/copy/SignalsTable.tsx";
-import { StatsCard } from "../components/copy/StatsCard.tsx";
 import { TradesTable } from "../components/copy/TradesTable.tsx";
+import { StatsCard } from "../components/copy/StatsCard.tsx";
+import { SystemStatePanel } from "../components/copy/SystemStatePanel.tsx";
+import { ConfigForm } from "../components/copy/ConfigForm.tsx";
 
 export function CopyTraderPage() {
   return (
@@ -12,9 +14,9 @@ export function CopyTraderPage() {
         </p>
       </header>
 
-      <section>
-        <StatsCard />
-      </section>
+      <SystemStatePanel />
+
+      <StatsCard />
 
       <section>
         <h2 className="mb-2 text-sm font-semibold uppercase text-surface-400">Trades</h2>
@@ -24,6 +26,11 @@ export function CopyTraderPage() {
       <section>
         <h2 className="mb-2 text-sm font-semibold uppercase text-surface-400">Signals</h2>
         <SignalsTable />
+      </section>
+
+      <section>
+        <h2 className="mb-2 text-sm font-semibold uppercase text-surface-400">Config</h2>
+        <ConfigForm />
       </section>
     </div>
   );
