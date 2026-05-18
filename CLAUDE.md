@@ -64,7 +64,7 @@ A single Node.js service (`apps/bot/src/index.ts`) boots in this order: validate
 
 ---
 
-## Where things live — `apps/copy-trader` (F0)
+## Where things live — `apps/copy-trader`
 
 | What | Where |
 |------|-------|
@@ -81,8 +81,22 @@ A single Node.js service (`apps/bot/src/index.ts`) boots in this order: validate
 | DB schema (Drizzle) | `apps/copy-trader/src/db/schema.ts` |
 | DB migrate runner | `apps/copy-trader/src/db/migrate.ts` |
 | Postgres schema | `copy_trader` (same instance as bot) |
+| Bybit V5 client | `apps/copy-trader/src/bybit.ts` |
+| Instrument info cache | `apps/copy-trader/src/instrumentInfo.ts` |
+| Sizing math | `apps/copy-trader/src/sizing.ts` + `sizing.test.ts` |
+| Config store (runtime) | `apps/copy-trader/src/configStore.ts` |
+| Risk gate (8 guardrails) | `apps/copy-trader/src/riskGate.ts` + `riskGate.test.ts` |
+| Executor (dry-run + live) | `apps/copy-trader/src/executor.ts` + `executor.test.ts` |
+| BullMQ queue + worker | `apps/copy-trader/src/queue.ts` |
+| Position watcher | `apps/copy-trader/src/watcher.ts` |
 
-**F0 scope:** listener + parser only. No trade execution. F1 (dry-run + risk gate + watcher) and F2 (live trading on Bybit perp) are separate plans authored after F0 has run in production and parser quality is validated.
+**F1 scope:** listener + parser + risk gate + dry-run executor + position watcher.
+Default `DRY_RUN=true` — every triggered signal is fully *planned* and persisted to
+`copy_trader.trades` (status=`DRY_RUN_LOGGED`) but no live order hits Bybit. Flip
+`DRY_RUN=false` in the config table via dashboard to go live (only do this after
+the F2 plan has been reviewed). The watcher BullMQ job polls Bybit every 30 s for
+trades with `dry_run=false` AND status in (PENDING_FILL, OPEN) to reconcile fills,
+closes, fees, and PnL.
 
 **Telegram session is a full-account credential** — generated locally via `pnpm --filter @dca/copy-trader auth`, pasted into Dokploy as `COPY_TG_SESSION_STRING`, never committed.
 
