@@ -98,7 +98,7 @@ export async function executeSignal(
       .returning({ id: trades.id });
     await db
       .update(signals)
-      .set({ tradeId: inserted[0].id })
+      .set({ tradeId: inserted[0].id, status: "EXECUTED" })
       .where(eq(signals.id, signal.signalId));
     logger.info("Dry-run logged", {
       signalHash: signal.signalHash,
@@ -151,7 +151,7 @@ export async function executeSignal(
       .returning({ id: trades.id });
     await db
       .update(signals)
-      .set({ tradeId: inserted[0].id })
+      .set({ tradeId: inserted[0].id, status: "EXECUTED" })
       .where(eq(signals.id, signal.signalId));
     logger.info("Live order placed", {
       signalHash: signal.signalHash,
@@ -174,19 +174,26 @@ async function insertErrorTrade(
   errorMessage: string,
   dryRun: boolean
 ): Promise<void> {
-  await db.insert(trades).values({
-    signalId: signal.signalId,
-    symbol: signal.symbol,
-    direction: signal.direction,
-    bybitOrderLinkId: `copy-err-${signal.signalHash.slice(0, 10)}-${Date.now()}`,
-    plannedQty: "0",
-    plannedMargin: "0",
-    leverageUsed,
-    entryStrategy: "MARKET",
-    tpPrice: String(signal.takeProfit1),
-    slPrice: String(signal.stopLoss),
-    status: "ERROR",
-    errorMessage,
-    dryRun,
-  });
+  const inserted = await db
+    .insert(trades)
+    .values({
+      signalId: signal.signalId,
+      symbol: signal.symbol,
+      direction: signal.direction,
+      bybitOrderLinkId: `copy-err-${signal.signalHash.slice(0, 10)}-${Date.now()}`,
+      plannedQty: "0",
+      plannedMargin: "0",
+      leverageUsed,
+      entryStrategy: "MARKET",
+      tpPrice: String(signal.takeProfit1),
+      slPrice: String(signal.stopLoss),
+      status: "ERROR",
+      errorMessage,
+      dryRun,
+    })
+    .returning({ id: trades.id });
+  await db
+    .update(signals)
+    .set({ tradeId: inserted[0].id, status: "EXECUTED" })
+    .where(eq(signals.id, signal.signalId));
 }

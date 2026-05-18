@@ -121,7 +121,13 @@ async function inferCloseInfo(
   _order: BybitOrder | null
 ): Promise<CloseInfo> {
   const execs = await getRecentExecutions(t.symbol, 50);
-  const closingExecs = execs.filter((e) => e.closedSize && Number(e.closedSize) > 0);
+  const fillTsMs = t.fillTs ? t.fillTs.getTime() : 0;
+  const closingExecs = execs.filter(
+    (e) =>
+      e.closedSize &&
+      Number(e.closedSize) > 0 &&
+      Number(e.execTime) >= fillTsMs
+  );
   if (closingExecs.length === 0) {
     return { status: "CLOSED_MANUAL", reason: "no closing executions found", exitPrice: null, pnl: null, fees: null };
   }
