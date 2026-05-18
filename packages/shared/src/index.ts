@@ -283,6 +283,7 @@ export interface CopySignal {
   signalHash: string;
   rawText: string;
   telegramMsgId: number;
+  telegramSenderId: number | null;
   receivedAt: string;
   direction: "LONG" | "SHORT" | null;
   symbol: string | null;

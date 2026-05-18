@@ -60,11 +60,26 @@ async function handleEvent(event: NewMessageEvent): Promise<void> {
   const msg = event.message;
   const text = msg.message;
   const msgId = msg.id;
+  const senderId = extractSenderId(msg);
   if (!text || typeof text !== "string") {
     logger.warn("Skipping non-text message", { msgId });
     return;
   }
-  await ingestSignalText(text, msgId);
+  await ingestSignalText(text, msgId, senderId);
+}
+
+/**
+ * gramjs surfaces senderId as a BigInteger | undefined depending on whether
+ * the message is from a user, a channel, or anonymous. Coerce to a plain
+ * number for storage; Telegram user IDs are well within Number.MAX_SAFE_INTEGER.
+ */
+function extractSenderId(msg: { senderId?: unknown }): number | null {
+  const raw = msg.senderId;
+  if (raw == null) return null;
+  // BigInteger from telegram lib has .toString() / .valueOf()
+  const asString = String(raw);
+  const n = Number(asString);
+  return Number.isFinite(n) ? n : null;
 }
 
 /**
@@ -73,7 +88,22 @@ async function handleEvent(event: NewMessageEvent): Promise<void> {
  * function for previously seen messages). Side-effect: Telegram notify on first
  * insert.
  */
-export async function ingestSignalText(text: string, msgId: number): Promise<void> {
+export async function ingestSignalText(
+  text: string,
+  msgId: number,
+  senderId: number | null = null
+): Promise<void> {
+  // Sender whitelist (optional). When the env var is configured, drop messages
+  // from anyone not on the list before we even parse — useful when the channel
+  // has many members chatting but only one trusted signaler.
+  if (
+    config.allowedSenderIds.size > 0 &&
+    (senderId == null || !config.allowedSenderIds.has(senderId))
+  ) {
+    logger.info("Skipping message from non-whitelisted sender", { msgId, senderId });
+    return;
+  }
+
   const parsed = parseSignal(text, msgId);
 
   // Drop messages that neither parse cleanly nor look like signals. The
@@ -96,6 +126,7 @@ export async function ingestSignalText(text: string, msgId: number): Promise<voi
           signalHash: i.signalHash,
           rawText: i.rawText,
           telegramMsgId: i.telegramMsgId,
+          telegramSenderId: senderId,
           direction: i.direction,
           symbol: i.symbol,
           entryLow: String(i.entryLow),
@@ -137,6 +168,7 @@ export async function ingestSignalText(text: string, msgId: number): Promise<voi
           signalHash: parsed.signalHash,
           rawText: parsed.rawText,
           telegramMsgId: parsed.telegramMsgId,
+          telegramSenderId: senderId,
           status: "UNPARSEABLE",
           skipReason: parsed.reason,
         })

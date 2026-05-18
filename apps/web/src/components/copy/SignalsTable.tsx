@@ -55,6 +55,7 @@ export function SignalsTable() {
             <tr>
               <th className="px-2 py-2 text-left">Received</th>
               <th className="px-2 py-2 text-left">Status</th>
+              <th className="px-2 py-2 text-right">Sender</th>
               <th className="px-2 py-2 text-left">Dir</th>
               <th className="px-2 py-2 text-left">Symbol</th>
               <th className="px-2 py-2 text-right">Entry Low</th>
@@ -72,6 +73,7 @@ export function SignalsTable() {
                   {new Date(s.receivedAt).toLocaleString()}
                 </td>
                 <td className="px-2 py-1">{s.status}</td>
+                <td className="px-2 py-1 text-right whitespace-nowrap">{s.telegramSenderId ?? "—"}</td>
                 <td className="px-2 py-1">{s.direction ?? "—"}</td>
                 <td className="px-2 py-1">{s.symbol ?? "—"}</td>
                 <td className="px-2 py-1 text-right">{s.entryLow ?? "—"}</td>

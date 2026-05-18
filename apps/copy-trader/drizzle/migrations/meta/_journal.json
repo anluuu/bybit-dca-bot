@@ -8,6 +8,13 @@
       "when": 1779113744626,
       "tag": "0000_pink_roland_deschain",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1779128697872,
+      "tag": "0001_bumpy_strong_guy",
+      "breakpoints": true
     }
   ]
 }

@@ -27,7 +27,14 @@ export async function reconcileRecentMessages(client: TelegramClient): Promise<v
         msg instanceof Api.Message && typeof msg.message === "string" && msg.message.length > 0
     );
     await Promise.allSettled(
-      ingestable.map((msg) => ingestSignalText(msg.message, msg.id))
+      ingestable.map((msg) => {
+        const senderId = msg.senderId ? Number(String(msg.senderId)) : null;
+        return ingestSignalText(
+          msg.message,
+          msg.id,
+          Number.isFinite(senderId as number) ? (senderId as number) : null
+        );
+      })
     );
     logger.info("Boot reconcile complete", { fetched: messages.length, processed: ingestable.length });
   } catch (error) {

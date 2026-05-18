@@ -81,6 +81,7 @@ export async function buildServer() {
           signalHash: r.signalHash,
           rawText: r.rawText,
           telegramMsgId: Number(r.telegramMsgId),
+          telegramSenderId: r.telegramSenderId == null ? null : Number(r.telegramSenderId),
           receivedAt: r.receivedAt.toISOString(),
           direction: r.direction as "LONG" | "SHORT" | null,
           symbol: r.symbol,

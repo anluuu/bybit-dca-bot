@@ -24,6 +24,11 @@ const configSchema = z.object({
 
   // Reconcile window
   BOOT_RECONCILE_LIMIT: z.coerce.number().int().min(0).max(500).default(50),
+
+  // Optional CSV of Telegram sender IDs to whitelist. When non-empty, messages
+  // from any other sender are dropped before they hit the parser or DB. Empty
+  // = passthrough (ingest from anyone in the channel).
+  COPY_TG_ALLOWED_SENDER_IDS: z.string().default(""),
 });
 
 const result = configSchema.safeParse(process.env);
@@ -34,4 +39,14 @@ if (!result.success) {
   process.exit(1);
 }
 
-export const config = Object.freeze(result.data);
+const parsed = result.data;
+const allowedSenderIds = parsed.COPY_TG_ALLOWED_SENDER_IDS.split(",")
+  .map((s) => s.trim())
+  .filter(Boolean)
+  .map((s) => Number(s))
+  .filter((n) => Number.isFinite(n));
+
+export const config = Object.freeze({
+  ...parsed,
+  allowedSenderIds: new Set(allowedSenderIds),
+});

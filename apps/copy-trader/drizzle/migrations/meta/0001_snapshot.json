@@ -1,0 +1,606 @@
+{
+  "id": "1e44b2cc-561a-45aa-8433-12fcbe8c5419",
+  "prevId": "9002f07d-902e-4ae2-922b-c0f53966c53e",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "copy_trader.config": {
+      "name": "config",
+      "schema": "copy_trader",
+      "columns": {
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "value": {
+          "name": "value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "copy_trader.daily_stats": {
+      "name": "daily_stats",
+      "schema": "copy_trader",
+      "columns": {
+        "day": {
+          "name": "day",
+          "type": "date",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "trades_opened": {
+          "name": "trades_opened",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "trades_closed": {
+          "name": "trades_closed",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "pnl_usdt": {
+          "name": "pnl_usdt",
+          "type": "numeric(20, 8)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0'"
+        },
+        "balance_start": {
+          "name": "balance_start",
+          "type": "numeric(20, 8)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "copy_trader.signals": {
+      "name": "signals",
+      "schema": "copy_trader",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "signal_hash": {
+          "name": "signal_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "raw_text": {
+          "name": "raw_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "telegram_msg_id": {
+          "name": "telegram_msg_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "telegram_sender_id": {
+          "name": "telegram_sender_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "received_at": {
+          "name": "received_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "direction": {
+          "name": "direction",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "symbol": {
+          "name": "symbol",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "entry_low": {
+          "name": "entry_low",
+          "type": "numeric(20, 8)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "entry_high": {
+          "name": "entry_high",
+          "type": "numeric(20, 8)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stop_loss": {
+          "name": "stop_loss",
+          "type": "numeric(20, 8)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "leverage_raw": {
+          "name": "leverage_raw",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "take_profit_1": {
+          "name": "take_profit_1",
+          "type": "numeric(20, 8)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "take_profit_2": {
+          "name": "take_profit_2",
+          "type": "numeric(20, 8)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "take_profit_3": {
+          "name": "take_profit_3",
+          "type": "numeric(20, 8)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "skip_reason": {
+          "name": "skip_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "trade_id": {
+          "name": "trade_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "signals_received_at_idx": {
+          "name": "signals_received_at_idx",
+          "columns": [
+            {
+              "expression": "received_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "signals_status_idx": {
+          "name": "signals_status_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "signals_signal_hash_key": {
+          "name": "signals_signal_hash_key",
+          "nullsNotDistinct": false,
+          "columns": [
+            "signal_hash"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "signals_status_check": {
+          "name": "signals_status_check",
+          "value": "\"copy_trader\".\"signals\".\"status\" IN ('PARSED','UNPARSEABLE','SKIPPED','EXECUTED')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "copy_trader.system_state": {
+      "name": "system_state",
+      "schema": "copy_trader",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "default": 1
+        },
+        "killed": {
+          "name": "killed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "killed_reason": {
+          "name": "killed_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "killed_at": {
+          "name": "killed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cooldown_until": {
+          "name": "cooldown_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cooldown_reason": {
+          "name": "cooldown_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "initial_capital": {
+          "name": "initial_capital",
+          "type": "numeric(20, 8)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "system_state_singleton": {
+          "name": "system_state_singleton",
+          "value": "\"copy_trader\".\"system_state\".\"id\" = 1"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "copy_trader.trades": {
+      "name": "trades",
+      "schema": "copy_trader",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "signal_id": {
+          "name": "signal_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "symbol": {
+          "name": "symbol",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "direction": {
+          "name": "direction",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bybit_order_id": {
+          "name": "bybit_order_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bybit_order_link_id": {
+          "name": "bybit_order_link_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "bybit_position_idx": {
+          "name": "bybit_position_idx",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "planned_qty": {
+          "name": "planned_qty",
+          "type": "numeric(20, 8)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "planned_margin": {
+          "name": "planned_margin",
+          "type": "numeric(20, 8)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "leverage_used": {
+          "name": "leverage_used",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entry_strategy": {
+          "name": "entry_strategy",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "limit_price": {
+          "name": "limit_price",
+          "type": "numeric(20, 8)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "limit_expires_at": {
+          "name": "limit_expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "filled_qty": {
+          "name": "filled_qty",
+          "type": "numeric(20, 8)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "avg_entry": {
+          "name": "avg_entry",
+          "type": "numeric(20, 8)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fill_ts": {
+          "name": "fill_ts",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tp_price": {
+          "name": "tp_price",
+          "type": "numeric(20, 8)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sl_price": {
+          "name": "sl_price",
+          "type": "numeric(20, 8)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "close_reason": {
+          "name": "close_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exit_price": {
+          "name": "exit_price",
+          "type": "numeric(20, 8)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "close_ts": {
+          "name": "close_ts",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pnl_usdt": {
+          "name": "pnl_usdt",
+          "type": "numeric(20, 8)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fees_usdt": {
+          "name": "fees_usdt",
+          "type": "numeric(20, 8)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "error_message": {
+          "name": "error_message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dry_run": {
+          "name": "dry_run",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "trades_status_idx": {
+          "name": "trades_status_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "trades_signal_id_idx": {
+          "name": "trades_signal_id_idx",
+          "columns": [
+            {
+              "expression": "signal_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "trades_created_at_idx": {
+          "name": "trades_created_at_idx",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "trades_signal_id_signals_id_fk": {
+          "name": "trades_signal_id_signals_id_fk",
+          "tableFrom": "trades",
+          "tableTo": "signals",
+          "schemaTo": "copy_trader",
+          "columnsFrom": [
+            "signal_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "trades_bybit_order_link_id_key": {
+          "name": "trades_bybit_order_link_id_key",
+          "nullsNotDistinct": false,
+          "columns": [
+            "bybit_order_link_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "trades_status_check": {
+          "name": "trades_status_check",
+          "value": "\"copy_trader\".\"trades\".\"status\" IN ('DRY_RUN_LOGGED','PENDING_FILL','OPEN','NOT_FILLED','CLOSED_TP','CLOSED_SL','CLOSED_MANUAL','LIQUIDATED','ERROR')"
+        },
+        "trades_entry_strategy_check": {
+          "name": "trades_entry_strategy_check",
+          "value": "\"copy_trader\".\"trades\".\"entry_strategy\" IN ('MARKET','LIMIT_CHASE')"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {
+    "copy_trader": "copy_trader"
+  },
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

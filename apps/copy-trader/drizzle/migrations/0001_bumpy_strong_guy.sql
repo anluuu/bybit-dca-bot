@@ -1,0 +1,1 @@
+ALTER TABLE "copy_trader"."signals" ADD COLUMN "telegram_sender_id" bigint;

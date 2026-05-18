@@ -62,6 +62,7 @@ services:
       NODE_ENV: production
       LOG_LEVEL: info
       BOOT_RECONCILE_LIMIT: 50
+      COPY_TG_ALLOWED_SENDER_IDS: ${COPY_TG_ALLOWED_SENDER_IDS:-}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3001/health/live"]
       interval: 30s

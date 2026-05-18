@@ -23,6 +23,7 @@ export const signals = copyTrader.table(
     signalHash: text("signal_hash").notNull(),
     rawText: text("raw_text").notNull(),
     telegramMsgId: bigint("telegram_msg_id", { mode: "number" }).notNull(),
+    telegramSenderId: bigint("telegram_sender_id", { mode: "number" }),
     receivedAt: timestamp("received_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
