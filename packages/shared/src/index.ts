@@ -304,3 +304,75 @@ export interface CopySignalsPage {
   total: number;
   items: CopySignal[];
 }
+
+export type CopyTradeStatus =
+  | "DRY_RUN_LOGGED"
+  | "PENDING_FILL"
+  | "OPEN"
+  | "NOT_FILLED"
+  | "CLOSED_TP"
+  | "CLOSED_SL"
+  | "CLOSED_MANUAL"
+  | "LIQUIDATED"
+  | "ERROR";
+
+export interface CopyTrade {
+  id: string;
+  signalId: string;
+  symbol: string;
+  direction: "LONG" | "SHORT";
+  bybitOrderId: string | null;
+  bybitOrderLinkId: string;
+  plannedQty: string;
+  plannedMargin: string;
+  leverageUsed: number;
+  entryStrategy: "MARKET" | "LIMIT_CHASE";
+  limitPrice: string | null;
+  limitExpiresAt: string | null;
+  filledQty: string | null;
+  avgEntry: string | null;
+  fillTs: string | null;
+  tpPrice: string;
+  slPrice: string;
+  status: CopyTradeStatus;
+  closeReason: string | null;
+  exitPrice: string | null;
+  closeTs: string | null;
+  pnlUsdt: string | null;
+  feesUsdt: string | null;
+  errorMessage: string | null;
+  dryRun: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CopyTradesPage {
+  page: number;
+  pageSize: number;
+  total: number;
+  items: CopyTrade[];
+}
+
+export interface CopyStatsBucket {
+  pnlUsdt: number;
+  tradesClosed: number;
+}
+
+export interface CopyStats {
+  today: CopyStatsBucket;
+  last7: CopyStatsBucket;
+  allTime: CopyStatsBucket;
+  wins: number;
+  losses: number;
+}
+
+export interface CopySystemState {
+  killed: boolean;
+  killedReason: string | null;
+  killedAt: string | null;
+  cooldownUntil: string | null;
+  cooldownReason: string | null;
+  initialCapital: string | null;
+}
+
+export type CopyConfig = Record<string, string>;

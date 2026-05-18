@@ -23,4 +23,11 @@ export type {
   CopySignal,
   CopySignalsPage,
   CopySignalStatus,
+  CopyTrade,
+  CopyTradesPage,
+  CopyTradeStatus,
+  CopyStatsBucket,
+  CopyStats,
+  CopySystemState,
+  CopyConfig,
 } from "@dca/shared";
