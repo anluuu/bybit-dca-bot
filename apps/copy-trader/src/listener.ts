@@ -1,7 +1,6 @@
 import { TelegramClient } from "telegram";
 import { StringSession } from "telegram/sessions/index.js";
 import { NewMessage, NewMessageEvent } from "telegram/events/index.js";
-import { Api } from "telegram";
 import { config } from "./config.js";
 import { logger } from "./logger.js";
 import { parseSignal } from "./parser.js";
@@ -137,9 +136,3 @@ export async function ingestSignalText(text: string, msgId: number): Promise<voi
   }
 }
 
-export function getClient(): TelegramClient | null {
-  return client;
-}
-
-// Re-export Api so callers can construct InputPeerChannel etc.
-export { Api };

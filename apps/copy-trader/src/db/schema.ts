@@ -135,7 +135,7 @@ export const systemState = copyTrader.table(
   (t) => [check("system_state_singleton", sql`${t.id} = 1`)]
 );
 
-export const config = copyTrader.table("config", {
+export const configTable = copyTrader.table("config", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
@@ -151,5 +151,5 @@ export type DailyStats = InferSelectModel<typeof dailyStats>;
 export type NewDailyStats = InferInsertModel<typeof dailyStats>;
 export type SystemState = InferSelectModel<typeof systemState>;
 export type NewSystemState = InferInsertModel<typeof systemState>;
-export type ConfigRow = InferSelectModel<typeof config>;
-export type NewConfigRow = InferInsertModel<typeof config>;
+export type ConfigRow = InferSelectModel<typeof configTable>;
+export type NewConfigRow = InferInsertModel<typeof configTable>;

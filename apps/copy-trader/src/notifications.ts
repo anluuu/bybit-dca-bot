@@ -22,7 +22,8 @@ export async function verifyChat(): Promise<void> {
   }
 }
 
-function escapeMd(text: string): string {
+function escapeMd(text: string | null | undefined): string {
+  if (text == null) return "";
   return text.replace(/[_*[\]()~`>#+\-=|{}.!]/g, "\\$&");
 }
 

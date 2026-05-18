@@ -1,7 +1,8 @@
 import Fastify, { FastifyReply, FastifyRequest } from "fastify";
 import cookie from "@fastify/cookie";
 import jwt from "@fastify/jwt";
-import { desc, eq, and, sql } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
+import type { CopySignalsPage } from "@dca/shared";
 import { db, sql as pg } from "./db/client.js";
 import { signals } from "./db/schema.js";
 import { config } from "./config.js";
@@ -50,7 +51,7 @@ export async function buildServer() {
   app.get(
     "/api/copy/signals",
     { preHandler: authPreHandler },
-    async (req) => {
+    async (req): Promise<CopySignalsPage> => {
       const q = req.query as { page?: string; pageSize?: string; status?: string };
       const page = Math.max(1, Number(q.page ?? "1"));
       const pageSize = Math.min(200, Math.max(1, Number(q.pageSize ?? "50")));
@@ -61,7 +62,7 @@ export async function buildServer() {
       const rows = await db
         .select()
         .from(signals)
-        .where(whereStatus ?? sql`true`)
+        .where(whereStatus)
         .orderBy(desc(signals.receivedAt))
         .limit(pageSize)
         .offset(offset);
@@ -69,7 +70,7 @@ export async function buildServer() {
       const total = await db
         .select({ count: sql<number>`count(*)::int` })
         .from(signals)
-        .where(whereStatus ?? sql`true`);
+        .where(whereStatus);
 
       return {
         page,
@@ -81,7 +82,7 @@ export async function buildServer() {
           rawText: r.rawText,
           telegramMsgId: Number(r.telegramMsgId),
           receivedAt: r.receivedAt.toISOString(),
-          direction: r.direction,
+          direction: r.direction as "LONG" | "SHORT" | null,
           symbol: r.symbol,
           entryLow: r.entryLow,
           entryHigh: r.entryHigh,
@@ -90,7 +91,7 @@ export async function buildServer() {
           takeProfit1: r.takeProfit1,
           takeProfit2: r.takeProfit2,
           takeProfit3: r.takeProfit3,
-          status: r.status,
+          status: r.status as CopySignalsPage["items"][number]["status"],
           skipReason: r.skipReason,
         })),
       };

@@ -22,14 +22,14 @@ export async function reconcileRecentMessages(client: TelegramClient): Promise<v
   logger.info("Boot reconcile starting", { limit });
   try {
     const messages = await client.getMessages(config.SIGNAL_CHANNEL_ID, { limit });
-    let processed = 0;
-    for (const msg of messages) {
-      if (msg instanceof Api.Message && typeof msg.message === "string" && msg.message.length > 0) {
-        await ingestSignalText(msg.message, msg.id);
-        processed++;
-      }
-    }
-    logger.info("Boot reconcile complete", { fetched: messages.length, processed });
+    const ingestable = messages.filter(
+      (msg): msg is Api.Message =>
+        msg instanceof Api.Message && typeof msg.message === "string" && msg.message.length > 0
+    );
+    await Promise.allSettled(
+      ingestable.map((msg) => ingestSignalText(msg.message, msg.id))
+    );
+    logger.info("Boot reconcile complete", { fetched: messages.length, processed: ingestable.length });
   } catch (error) {
     logger.error("Boot reconcile failed", {
       error: error instanceof Error ? error.message : String(error),
