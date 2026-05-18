@@ -4,12 +4,18 @@ import { NewMessage, NewMessageEvent } from "telegram/events/index.js";
 import { config } from "./config.js";
 import { logger } from "./logger.js";
 import { parseSignal } from "./parser.js";
+import type { SignalIntent } from "./parser.js";
 import { db } from "./db/client.js";
-import { signals } from "./db/schema.js";
+import { signals, trades as tradesTable, systemState as ssTable } from "./db/schema.js";
 import {
   notifySignalParsed,
   notifySignalUnparseable,
 } from "./notifications.js";
+import { evaluateRiskGate, type GateContext } from "./riskGate.js";
+import { executeSignal } from "./executor.js";
+import { getLastPrice, getWalletBalanceUsdt } from "./bybit.js";
+import { getConfigNumber, getConfigBool, getConfigCsv } from "./configStore.js";
+import { and, eq, inArray, sql as drizzleSql } from "drizzle-orm";
 
 /**
  * Heuristic for "this message looks like a trading signal." Used to gate
@@ -102,6 +108,126 @@ function extractSenderId(msg: { senderId?: unknown }): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+async function executeWithGate(intent: SignalIntent, signalId: string): Promise<void> {
+  try {
+    const [
+      maxOpen,
+      dailyLossPct,
+      maxDrawdownPct,
+      chaseTolerancePct,
+      minRrRatio,
+      maxRiskPct,
+      maxLeverage,
+      chaseTimeoutMin,
+      dryRun,
+      whitelist,
+    ] = await Promise.all([
+      getConfigNumber("MAX_OPEN_POSITIONS"),
+      getConfigNumber("DAILY_LOSS_LIMIT_PCT"),
+      getConfigNumber("MAX_DRAWDOWN_PCT"),
+      getConfigNumber("CHASE_TOLERANCE_PCT"),
+      getConfigNumber("MIN_RR_RATIO"),
+      getConfigNumber("MAX_RISK_PCT"),
+      getConfigNumber("MAX_LEVERAGE"),
+      getConfigNumber("CHASE_TIMEOUT_MIN"),
+      getConfigBool("DRY_RUN"),
+      getConfigCsv("WHITELIST_SYMBOLS"),
+    ]);
+
+    const stateRows = await db.select().from(ssTable).where(eq(ssTable.id, 1)).limit(1);
+    const state = stateRows[0];
+    if (!state) {
+      logger.warn("system_state row missing, skipping execute");
+      return;
+    }
+
+    const openCountRows = await db
+      .select({ c: drizzleSql<number>`count(*)::int` })
+      .from(tradesTable)
+      .where(and(eq(tradesTable.dryRun, false), inArray(tradesTable.status, ["PENDING_FILL", "OPEN"])));
+    const openCount = openCountRows[0]?.c ?? 0;
+
+    const initialCapital = Number(state.initialCapital ?? 0);
+    const balanceUsdt = config.BYBIT_API_KEY
+      ? await getWalletBalanceUsdt().catch(() => initialCapital)
+      : initialCapital;
+    const lastPrice = config.BYBIT_API_KEY
+      ? await getLastPrice(intent.symbol).catch(() => (intent.entryLow + intent.entryHigh) / 2)
+      : (intent.entryLow + intent.entryHigh) / 2;
+
+    const gateCtx: GateContext = {
+      config: {
+        MAX_OPEN_POSITIONS: maxOpen,
+        DAILY_LOSS_LIMIT_PCT: dailyLossPct,
+        MAX_DRAWDOWN_PCT: maxDrawdownPct,
+        CHASE_TOLERANCE_PCT: chaseTolerancePct,
+        MIN_RR_RATIO: minRrRatio,
+        WHITELIST_SYMBOLS: whitelist,
+      },
+      state: {
+        killed: state.killed,
+        killedReason: state.killedReason,
+        cooldownUntil: state.cooldownUntil,
+        initialCapital,
+      },
+      balance: balanceUsdt,
+      openCount,
+      dayPnl: 0,
+      dayBalanceStart: initialCapital,
+      lastPrice,
+      now: new Date(),
+    };
+
+    const gate = evaluateRiskGate(
+      {
+        signalHash: intent.signalHash,
+        direction: intent.direction,
+        symbol: intent.symbol,
+        entryLow: intent.entryLow,
+        entryHigh: intent.entryHigh,
+        stopLoss: intent.stopLoss,
+        takeProfit1: intent.takeProfit1,
+        leverageRaw: intent.leverageRaw,
+      },
+      gateCtx
+    );
+
+    if (!gate.ok) {
+      logger.info("Gate rejected", { signalHash: intent.signalHash, reason: gate.reason });
+      return;
+    }
+
+    await executeSignal(
+      {
+        signalId,
+        signalHash: intent.signalHash,
+        direction: intent.direction,
+        symbol: intent.symbol,
+        entryLow: intent.entryLow,
+        entryHigh: intent.entryHigh,
+        stopLoss: intent.stopLoss,
+        takeProfit1: intent.takeProfit1,
+        leverageRaw: intent.leverageRaw,
+      },
+      {
+        dryRun,
+        maxLeverage,
+        maxRiskPct,
+        balanceUsdt,
+        lastPrice,
+        entryStrategy: gate.entryStrategy,
+        limitPrice: gate.limitPrice,
+        chaseTimeoutMin,
+      }
+    );
+  } catch (e) {
+    logger.error("executeWithGate threw", {
+      signalHash: intent.signalHash,
+      error: e instanceof Error ? e.message : String(e),
+    });
+  }
+}
+
 /**
  * Inserts a row in `signals`. Idempotent against signal_hash unique constraint:
  * if the row already exists we treat it as success (boot reconcile re-runs this
@@ -181,6 +307,7 @@ export async function ingestSignalText(
         stopLoss: i.stopLoss,
         takeProfit1: i.takeProfit1,
       });
+      void executeWithGate(i, inserted[0].id);
     } else {
       const inserted = await db
         .insert(signals)
