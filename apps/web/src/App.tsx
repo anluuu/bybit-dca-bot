@@ -302,13 +302,13 @@ function AdminDashboard() {
 
       <div className="mb-6 flex gap-2">
         <button
-          className={`rounded px-3 py-1 text-sm ${view === "dca" ? "bg-amber-glow text-black" : "bg-surface-2"}`}
+          className={`rounded px-3 py-1 text-sm ${view === "dca" ? "bg-amber-glow text-black" : "bg-surface-800"}`}
           onClick={() => setView("dca")}
         >
           DCA
         </button>
         <button
-          className={`rounded px-3 py-1 text-sm ${view === "copy" ? "bg-amber-glow text-black" : "bg-surface-2"}`}
+          className={`rounded px-3 py-1 text-sm ${view === "copy" ? "bg-amber-glow text-black" : "bg-surface-800"}`}
           onClick={() => setView("copy")}
         >
           Copy Trader

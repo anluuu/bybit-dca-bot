@@ -1,4 +1,4 @@
-CREATE SCHEMA "copy_trader";
+CREATE SCHEMA IF NOT EXISTS "copy_trader";
 --> statement-breakpoint
 CREATE TABLE "copy_trader"."config" (
 	"key" text PRIMARY KEY NOT NULL,

@@ -7,7 +7,6 @@ import { logger } from "./logger.js";
 import { parseSignal } from "./parser.js";
 import { db } from "./db/client.js";
 import { signals } from "./db/schema.js";
-import { eq } from "drizzle-orm";
 import {
   notifySignalParsed,
   notifySignalUnparseable,
@@ -65,7 +64,7 @@ export async function ingestSignalText(text: string, msgId: number): Promise<voi
   try {
     if (parsed.kind === "ok") {
       const i = parsed.intent;
-      await db
+      const inserted = await db
         .insert(signals)
         .values({
           signalHash: i.signalHash,
@@ -82,16 +81,16 @@ export async function ingestSignalText(text: string, msgId: number): Promise<voi
           takeProfit3: i.takeProfit3 !== undefined ? String(i.takeProfit3) : null,
           status: "PARSED",
         })
-        .onConflictDoNothing({ target: signals.signalHash });
+        .onConflictDoNothing({ target: signals.signalHash })
+        .returning({ id: signals.id });
 
-      const inserted = await db
-        .select({ id: signals.id })
-        .from(signals)
-        .where(eq(signals.signalHash, i.signalHash))
-        .limit(1);
+      if (inserted.length === 0) {
+        logger.info("Signal already seen, skipping notify", { signalHash: i.signalHash, msgId });
+        return;
+      }
 
       logger.info("Signal ingested", {
-        signalId: inserted[0]?.id,
+        signalId: inserted[0].id,
         direction: i.direction,
         symbol: i.symbol,
         msgId,
@@ -106,7 +105,7 @@ export async function ingestSignalText(text: string, msgId: number): Promise<voi
         takeProfit1: i.takeProfit1,
       });
     } else {
-      await db
+      const inserted = await db
         .insert(signals)
         .values({
           signalHash: parsed.signalHash,
@@ -115,7 +114,13 @@ export async function ingestSignalText(text: string, msgId: number): Promise<voi
           status: "UNPARSEABLE",
           skipReason: parsed.reason,
         })
-        .onConflictDoNothing({ target: signals.signalHash });
+        .onConflictDoNothing({ target: signals.signalHash })
+        .returning({ id: signals.id });
+
+      if (inserted.length === 0) {
+        logger.info("Signal already seen, skipping notify", { signalHash: parsed.signalHash, msgId });
+        return;
+      }
 
       logger.warn("Signal unparseable", { reason: parsed.reason, msgId });
       void notifySignalUnparseable({

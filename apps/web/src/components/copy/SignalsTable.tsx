@@ -33,7 +33,7 @@ export function SignalsTable() {
       <div className="flex items-center gap-2">
         <label className="text-sm text-gray-400">Status:</label>
         <select
-          className="rounded bg-surface-2 px-2 py-1 text-sm"
+          className="rounded bg-surface-800 px-2 py-1 text-sm"
           value={status}
           onChange={(e) => {
             setStatus(e.target.value);
@@ -67,7 +67,7 @@ export function SignalsTable() {
           </thead>
           <tbody>
             {data.items.map((s) => (
-              <tr key={s.id} className="border-t border-surface-2">
+              <tr key={s.id} className="border-t border-surface-700/10">
                 <td className="px-2 py-1 whitespace-nowrap">
                   {new Date(s.receivedAt).toLocaleString()}
                 </td>
@@ -90,7 +90,7 @@ export function SignalsTable() {
 
       <div className="flex items-center gap-2">
         <button
-          className="rounded bg-surface-2 px-3 py-1 text-sm disabled:opacity-40"
+          className="rounded bg-surface-800 px-3 py-1 text-sm disabled:opacity-40"
           onClick={() => setPage((p) => Math.max(1, p - 1))}
           disabled={page === 1}
         >
@@ -100,7 +100,7 @@ export function SignalsTable() {
           Page {page} / {Math.max(1, Math.ceil(data.total / data.pageSize))}
         </span>
         <button
-          className="rounded bg-surface-2 px-3 py-1 text-sm disabled:opacity-40"
+          className="rounded bg-surface-800 px-3 py-1 text-sm disabled:opacity-40"
           onClick={() => setPage((p) => p + 1)}
           disabled={page * data.pageSize >= data.total}
         >

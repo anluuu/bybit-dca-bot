@@ -80,8 +80,6 @@ services:
     depends_on:
       bot:
         condition: service_healthy
-      copy-trader:
-        condition: service_healthy
     expose:
       - "80"
     labels:
