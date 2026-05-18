@@ -11,6 +11,22 @@ import {
   notifySignalUnparseable,
 } from "./notifications.js";
 
+/**
+ * Heuristic for "this message looks like a trading signal." Used to gate
+ * the unparseable-signal Telegram notification so casual chat in the channel
+ * doesn't generate alert noise. Matches the signaler's typical structural
+ * markers; if none are present we skip the alert and only persist the row.
+ */
+function looksLikeSignal(text: string): boolean {
+  return (
+    /\b(LONG|SHORT)\b/i.test(text) ||
+    /\bEntrada\s*:/i.test(text) ||
+    /\bAlavancagem\s*:/i.test(text) ||
+    /\bTP\d\s*:/i.test(text) ||
+    /\bSL\s*:/i.test(text)
+  );
+}
+
 let client: TelegramClient | null = null;
 
 export async function startListener(): Promise<TelegramClient> {
@@ -122,11 +138,16 @@ export async function ingestSignalText(text: string, msgId: number): Promise<voi
       }
 
       logger.warn("Signal unparseable", { reason: parsed.reason, msgId });
-      void notifySignalUnparseable({
-        reason: parsed.reason,
-        preview: parsed.rawText,
-        msgId,
-      });
+      // Only ping the operator when the message *looks* like a signal but
+      // failed to parse — the channel mixes casual chat with signals, and
+      // notifying on every chat line floods Telegram with false positives.
+      if (looksLikeSignal(parsed.rawText)) {
+        void notifySignalUnparseable({
+          reason: parsed.reason,
+          preview: parsed.rawText,
+          msgId,
+        });
+      }
     }
   } catch (error) {
     logger.error("Failed to ingest signal", {

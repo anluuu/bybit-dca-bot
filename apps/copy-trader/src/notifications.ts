@@ -27,15 +27,20 @@ function escapeMd(text: string | null | undefined): string {
   return text.replace(/[_*[\]()~`>#+\-=|{}.!]/g, "\\$&");
 }
 
-async function send(message: string): Promise<void> {
+async function send(
+  message: string,
+  opts: { plain?: boolean } = {}
+): Promise<void> {
   if (!bot) {
     logger.warn("send() before initNotifier(); dropping message");
     return;
   }
   try {
-    await bot.telegram.sendMessage(config.TELEGRAM_NOTIFY_CHAT_ID, message, {
-      parse_mode: "MarkdownV2",
-    });
+    await bot.telegram.sendMessage(
+      config.TELEGRAM_NOTIFY_CHAT_ID,
+      message,
+      opts.plain ? undefined : { parse_mode: "MarkdownV2" }
+    );
   } catch (error) {
     logger.error("Notification send failed", {
       error: error instanceof Error ? error.message : String(error),
@@ -76,12 +81,16 @@ export function notifySignalUnparseable(args: {
   msgId: number;
 }): Promise<void> {
   return safeAsync(async () => {
+    // Plain text (no parse_mode) — the raw signal body can contain any
+    // character the signaler types and MarkdownV2 escape rules are too brittle
+    // to round-trip cleanly inside code fences. This is an operator-diagnostic
+    // notification, so formatting doesn't matter.
     const body =
-      `*⚠️ Unparseable signal*\n\n` +
-      `Reason: ${escapeMd(args.reason)}\n` +
-      `Msg id: ${escapeMd(String(args.msgId))}\n\n` +
-      `\`\`\`\n${args.preview.slice(0, 300)}\n\`\`\``;
-    await send(body);
+      `⚠️ Unparseable signal\n\n` +
+      `Reason: ${args.reason}\n` +
+      `Msg id: ${args.msgId}\n\n` +
+      args.preview.slice(0, 300);
+    await send(body, { plain: true });
   });
 }
 
