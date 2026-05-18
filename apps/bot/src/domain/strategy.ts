@@ -18,6 +18,7 @@ import {
   notifyFailure,
   notifyCapReached,
   notifyInsufficientFunds,
+  notifyTransfer,
 } from "../infra/notifications.js";
 import { getCompositeSignal, type CompositeSignal } from "./signals/compose.js";
 import { logger } from "../logger.js";
@@ -77,13 +78,26 @@ const QUOTE_COIN = "BRL";
  * `requiredBrl` is the BRL amount the order intends to consume. The wrapper
  * adds a 10% buffer internally via ensureSpotBalance's deficit math.
  */
+/**
+ * Topping up Spot is a domain operation; the Telegram notify that follows is
+ * an outbound side-effect. ensureSpotBalance returns the transfer detail so
+ * the notification can fire here, in the caller, without coupling the domain
+ * module to the notifier.
+ */
+async function topUpSpotBalance(coin: string, required: number): Promise<void> {
+  const result = await ensureSpotBalance(coin, required);
+  if (result.transferred && result.transferredAmount != null && result.transferId) {
+    await notifyTransfer(result.transferredAmount, coin, result.transferId);
+  }
+}
+
 async function placeMarketOrderWithRetry(
   pair: string,
   quoteAmount: string,
   requiredBrl: number
 ): Promise<string> {
   const required = requiredBrl * 1.1;
-  await ensureSpotBalance(QUOTE_COIN, required);
+  await topUpSpotBalance(QUOTE_COIN, required);
   try {
     return await placeMarketOrder(pair, quoteAmount);
   } catch (error) {
@@ -95,7 +109,7 @@ async function placeMarketOrderWithRetry(
         pair,
         requiredBrl,
       });
-      await ensureSpotBalance(QUOTE_COIN, required);
+      await topUpSpotBalance(QUOTE_COIN, required);
       return await placeMarketOrder(pair, quoteAmount);
     }
     throw error;

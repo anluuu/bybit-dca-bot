@@ -3,7 +3,7 @@ import { db } from "./db/client.js";
 import { sql } from "./db/client.js";
 import { runMigrations } from "./db/migrate.js";
 import { assets } from "./db/schema.js";
-import { createRedisConnection, setupQueue, registerJobs } from "./infra/queue.js";
+import { createRedisConnection, setupQueue, registerJobs } from "./queue.js";
 import { startServer } from "./server.js";
 import { initBot, verifyTelegramChat } from "./infra/notifications.js";
 import { initSignalsCache } from "./domain/signals/cache.js";

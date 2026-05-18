@@ -4,8 +4,8 @@ import { logger } from "../../logger.js";
 /**
  * Signal data cache backed by the shared Redis connection.
  *
- * We reuse the existing BullMQ Redis instance (initialized in queue.ts and
- * passed in at boot from index.ts) rather than opening a second connection:
+ * We reuse the existing BullMQ Redis instance (initialized in src/queue.ts
+ * and passed in at boot from index.ts) rather than opening a second connection:
  *   - operationally simpler (one TTL/eviction policy, one connection count)
  *   - caches survive bot restarts (kline history doesn't change for hours)
  *   - horizontally-shared if the bot ever scales to multiple replicas

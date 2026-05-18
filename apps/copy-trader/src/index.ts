@@ -2,7 +2,7 @@ import { config } from "./config.js";
 import { logger } from "./logger.js";
 import { runMigrations } from "./db/migrate.js";
 import { initNotifier, verifyChat, notifyLifecycle } from "./infra/notifications.js";
-import { startListener, stopListener } from "./domain/listener.js";
+import { startListener, stopListener } from "./listener.js";
 import { reconcileRecentMessages } from "./recovery.js";
 import { startServer } from "./server.js";
 import { db } from "./db/client.js";

@@ -5,7 +5,6 @@ import {
   transferFundingToSpot,
 } from "../infra/exchange.js";
 import { logger } from "../logger.js";
-import { notifyTransfer } from "../infra/notifications.js";
 
 export class InsufficientFundsError extends ExchangeClientError {
   constructor(
@@ -90,8 +89,6 @@ export async function ensureSpotBalance(
         spotBefore: spot.toFixed(2),
         fundingBefore: funding.toFixed(2),
       });
-
-      await notifyTransfer(transferAmount, coin, transferId);
 
       return {
         transferred: true,

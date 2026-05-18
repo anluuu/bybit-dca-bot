@@ -155,14 +155,3 @@ export async function reconcilePendingOrders(): Promise<void> {
   }
 }
 
-/**
- * Null-safe reconcile for bulk status filter. Exposed for future admin
- * endpoint callers that want to trigger this on demand.
- */
-export async function countPendingOrders(): Promise<number> {
-  const [{ total }] = await db
-    .select({ total: sql<string>`COUNT(*)` })
-    .from(orders)
-    .where(eq(orders.status, "pending"));
-  return parseInt(total, 10);
-}

@@ -1,20 +1,20 @@
 import { TelegramClient } from "telegram";
 import { StringSession } from "telegram/sessions/index.js";
 import { NewMessage, NewMessageEvent } from "telegram/events/index.js";
-import { config } from "../config.js";
-import { logger } from "../logger.js";
-import { parseSignal } from "./parser.js";
-import type { SignalIntent } from "./parser.js";
-import { db } from "../db/client.js";
-import { signals, trades as tradesTable, systemState as ssTable, dailyStats as dsTable } from "../db/schema.js";
+import { config } from "./config.js";
+import { logger } from "./logger.js";
+import { parseSignal } from "./domain/parser.js";
+import type { SignalIntent } from "./domain/parser.js";
+import { db } from "./db/client.js";
+import { signals, trades as tradesTable, systemState as ssTable, dailyStats as dsTable } from "./db/schema.js";
 import {
   notifySignalParsed,
   notifySignalUnparseable,
-} from "../infra/notifications.js";
-import { evaluateRiskGate, type GateContext } from "./riskGate.js";
-import { executeSignal } from "./executor.js";
-import { getLastPrice, getWalletBalanceUsdt } from "../infra/bybit.js";
-import { getAllConfig } from "../infra/configStore.js";
+} from "./infra/notifications.js";
+import { evaluateRiskGate, type GateContext } from "./domain/riskGate.js";
+import { executeSignal } from "./domain/executor.js";
+import { getLastPrice, getWalletBalanceUsdt } from "./infra/bybit.js";
+import { getAllConfig } from "./infra/configStore.js";
 import { and, eq, inArray, sql as drizzleSql } from "drizzle-orm";
 
 /**

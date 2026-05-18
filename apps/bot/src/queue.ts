@@ -1,13 +1,13 @@
 import { Queue, Worker, UnrecoverableError } from "bullmq";
 import type { Job } from "bullmq";
 import { Redis } from "ioredis";
-import { config } from "../config.js";
-import { db } from "../db/client.js";
-import { assets, orders } from "../db/schema.js";
+import { config } from "./config.js";
+import { db } from "./db/client.js";
+import { assets, orders } from "./db/schema.js";
 import { eq } from "drizzle-orm";
-import { executeDca } from "../domain/strategy.js";
-import { notifyFailure } from "./notifications.js";
-import { logger } from "../logger.js";
+import { executeDca } from "./domain/strategy.js";
+import { notifyFailure } from "./infra/notifications.js";
+import { logger } from "./logger.js";
 
 const QUEUE_NAME = "dca-jobs";
 
