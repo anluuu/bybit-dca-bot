@@ -90,3 +90,47 @@ Ordem ativa já preenchida`;
     expect(a.intent.signalHash).toMatch(/^[a-f0-9]{64}$/);
   });
 });
+
+describe("parseSignal — error paths", () => {
+  it("rejects when no direction word present", () => {
+    const r = parseSignal("Apenas um texto qualquer sem estrutura", 1);
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.reason).toBe("NO_DIRECTION_OR_SYMBOL");
+  });
+
+  it("rejects unknown symbol", () => {
+    const r = parseSignal(
+      "LONG FAKECOIN\nEntrada: 1 - 2\nSL: 0.5\nAlavancagem: 5x\nTP1: 3",
+      1
+    );
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.reason).toMatch(/^UNKNOWN_SYMBOL:/);
+  });
+
+  it("rejects LONG with SL above entry", () => {
+    const r = parseSignal(
+      "LONG BTC\nEntrada: 100 - 200\nSL: 300\nAlavancagem: 5x\nTP1: 250",
+      1
+    );
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.reason).toBe("SL_NOT_BELOW_ENTRY_FOR_LONG");
+  });
+
+  it("rejects SHORT with SL below entry", () => {
+    const r = parseSignal(
+      "SHORT BTC\nEntrada: 100 - 200\nSL: 50\nAlavancagem: 5x\nTP1: 80",
+      1
+    );
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.reason).toBe("SL_NOT_ABOVE_ENTRY_FOR_SHORT");
+  });
+
+  it("rejects when TP1 is missing", () => {
+    const r = parseSignal(
+      "LONG BTC\nEntrada: 100 - 200\nSL: 90\nAlavancagem: 5x\nTP2: 250",
+      1
+    );
+    expect(r.kind).toBe("error");
+    if (r.kind === "error") expect(r.reason).toBe("NO_TP1");
+  });
+});
