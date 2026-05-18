@@ -1,0 +1,42 @@
+name: copy-trader
+
+on:
+  push:
+    paths:
+      - "apps/copy-trader/**"
+      - "packages/shared/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/copy-trader.yml"
+  pull_request:
+    paths:
+      - "apps/copy-trader/**"
+      - "packages/shared/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/copy-trader.yml"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.30.2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared
+        run: pnpm --filter @dca/shared build
+
+      - name: Typecheck
+        run: pnpm --filter @dca/copy-trader typecheck
+
+      - name: Test
+        run: pnpm --filter @dca/copy-trader test
