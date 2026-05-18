@@ -76,6 +76,17 @@ async function handleEvent(event: NewMessageEvent): Promise<void> {
 export async function ingestSignalText(text: string, msgId: number): Promise<void> {
   const parsed = parseSignal(text, msgId);
 
+  // Drop messages that neither parse cleanly nor look like signals. The
+  // channel mixes signals with casual chat from members — without this gate
+  // every "good luck" / "what do you think" line gets persisted as
+  // UNPARSEABLE and clutters the dashboard. Real signals still parse OK and
+  // signal-shaped failures still go through as UNPARSEABLE (so the operator
+  // can see what's broken in the parser).
+  if (parsed.kind !== "ok" && !looksLikeSignal(text)) {
+    logger.info("Skipping non-signal message", { msgId, reason: parsed.reason });
+    return;
+  }
+
   try {
     if (parsed.kind === "ok") {
       const i = parsed.intent;
@@ -138,16 +149,13 @@ export async function ingestSignalText(text: string, msgId: number): Promise<voi
       }
 
       logger.warn("Signal unparseable", { reason: parsed.reason, msgId });
-      // Only ping the operator when the message *looks* like a signal but
-      // failed to parse — the channel mixes casual chat with signals, and
-      // notifying on every chat line floods Telegram with false positives.
-      if (looksLikeSignal(parsed.rawText)) {
-        void notifySignalUnparseable({
-          reason: parsed.reason,
-          preview: parsed.rawText,
-          msgId,
-        });
-      }
+      // We only reached this branch because the message looked signal-shaped
+      // (chat is filtered out by the early-return above).
+      void notifySignalUnparseable({
+        reason: parsed.reason,
+        preview: parsed.rawText,
+        msgId,
+      });
     }
   } catch (error) {
     logger.error("Failed to ingest signal", {

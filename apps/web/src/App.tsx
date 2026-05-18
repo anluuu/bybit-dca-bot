@@ -279,6 +279,20 @@ function AdminDashboard() {
           </h1>
           <p className="text-xs text-surface-400">{t("app.subtitle")}</p>
         </div>
+        <nav className="ml-6 flex items-center gap-1 rounded-lg border border-surface-700/30 bg-surface-800/40 p-1">
+          <button
+            className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${view === "dca" ? "bg-amber-glow text-black" : "text-surface-300 hover:text-surface-100"}`}
+            onClick={() => setView("dca")}
+          >
+            DCA
+          </button>
+          <button
+            className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${view === "copy" ? "bg-amber-glow text-black" : "text-surface-300 hover:text-surface-100"}`}
+            onClick={() => setView("copy")}
+          >
+            Copy Trader
+          </button>
+        </nav>
         <div className="ml-auto flex items-center gap-3">
           <div className="hidden sm:flex items-center gap-2 rounded-lg border border-surface-700/30 bg-surface-800/40 px-3 py-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-green-gain" />
@@ -299,21 +313,6 @@ function AdminDashboard() {
           </button>
         </div>
       </header>
-
-      <div className="mb-6 flex gap-2">
-        <button
-          className={`rounded px-3 py-1 text-sm ${view === "dca" ? "bg-amber-glow text-black" : "bg-surface-800"}`}
-          onClick={() => setView("dca")}
-        >
-          DCA
-        </button>
-        <button
-          className={`rounded px-3 py-1 text-sm ${view === "copy" ? "bg-amber-glow text-black" : "bg-surface-800"}`}
-          onClick={() => setView("copy")}
-        >
-          Copy Trader
-        </button>
-      </div>
 
       {view === "dca" && (
         <>
