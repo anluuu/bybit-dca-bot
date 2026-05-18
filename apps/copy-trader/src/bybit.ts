@@ -138,36 +138,29 @@ export async function getWalletBalanceUsdt(): Promise<number> {
   return Number.isFinite(n) ? n : 0;
 }
 
+// retCode 110043 (leverage not modified) is treated as success in classifyRetCode,
+// so call() returns without throwing on that benign case — no try/catch needed.
 export async function setLeverage(symbol: string, leverage: number): Promise<void> {
-  try {
-    await call<unknown>("post", "/v5/position/set-leverage", {
-      category: "linear",
-      symbol,
-      buyLeverage: String(leverage),
-      sellLeverage: String(leverage),
-    });
-  } catch (e) {
-    if (e instanceof ExchangeClientError && e.retCode === 110043) return; // not modified
-    throw e;
-  }
+  await call<unknown>("post", "/v5/position/set-leverage", {
+    category: "linear",
+    symbol,
+    buyLeverage: String(leverage),
+    sellLeverage: String(leverage),
+  });
 }
 
+// retCode 110026 (margin mode not modified) is the equivalent benign case.
 export async function setMarginModeIsolated(
   symbol: string,
   leverage: number
 ): Promise<void> {
-  try {
-    await call<unknown>("post", "/v5/position/switch-isolated", {
-      category: "linear",
-      symbol,
-      tradeMode: 1,
-      buyLeverage: String(leverage),
-      sellLeverage: String(leverage),
-    });
-  } catch (e) {
-    if (e instanceof ExchangeClientError && e.retCode === 110026) return; // not modified
-    throw e;
-  }
+  await call<unknown>("post", "/v5/position/switch-isolated", {
+    category: "linear",
+    symbol,
+    tradeMode: 1,
+    buyLeverage: String(leverage),
+    sellLeverage: String(leverage),
+  });
 }
 
 interface TickerListResult {

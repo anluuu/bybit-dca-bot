@@ -6,8 +6,6 @@ import {
   getOrderByLinkId,
   getPosition,
   getRecentExecutions,
-  type BybitOrder,
-  type BybitExecution,
 } from "./bybit.js";
 import { getConfigNumber } from "./configStore.js";
 import { notifyLifecycle } from "./notifications.js";
@@ -35,11 +33,12 @@ export async function watcherTick(): Promise<void> {
 }
 
 async function reconcileTrade(t: typeof trades.$inferSelect): Promise<void> {
-  const order = await getOrderByLinkId(t.bybitOrderLinkId);
-  const position = await getPosition(t.symbol);
+  // PENDING_FILL transitions need the order only.
+  // OPEN transitions need the position only (and executions if it has closed).
+  // Branch the Bybit fetches so each tick costs at most one HTTP call per trade.
 
-  // PENDING_FILL transitions
   if (t.status === "PENDING_FILL") {
+    const order = await getOrderByLinkId(t.bybitOrderLinkId);
     if (order && (order.orderStatus === "Filled" || order.orderStatus === "PartiallyFilled")) {
       await db
         .update(trades)
@@ -67,10 +66,10 @@ async function reconcileTrade(t: typeof trades.$inferSelect): Promise<void> {
     return; // still pending
   }
 
-  // OPEN → closed?
   if (t.status === "OPEN") {
+    const position = await getPosition(t.symbol);
     if (position) return; // still open
-    const closeInfo = await inferCloseInfo(t, order);
+    const closeInfo = await inferCloseInfo(t);
     await db
       .update(trades)
       .set({
@@ -116,10 +115,7 @@ interface CloseInfo {
   fees: string | null;
 }
 
-async function inferCloseInfo(
-  t: typeof trades.$inferSelect,
-  _order: BybitOrder | null
-): Promise<CloseInfo> {
+async function inferCloseInfo(t: typeof trades.$inferSelect): Promise<CloseInfo> {
   const execs = await getRecentExecutions(t.symbol, 50);
   const fillTsMs = t.fillTs ? t.fillTs.getTime() : 0;
   const closingExecs = execs.filter(

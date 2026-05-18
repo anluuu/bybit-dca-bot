@@ -10,6 +10,7 @@ function useConfig() {
       if (!res.ok) throw new Error(`Failed to load config (${res.status})`);
       return res.json();
     },
+    refetchInterval: 30_000,
   });
 }
 

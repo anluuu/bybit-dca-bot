@@ -6,7 +6,7 @@ import { logger } from "./logger.js";
 import { parseSignal } from "./parser.js";
 import type { SignalIntent } from "./parser.js";
 import { db } from "./db/client.js";
-import { signals, trades as tradesTable, systemState as ssTable } from "./db/schema.js";
+import { signals, trades as tradesTable, systemState as ssTable, dailyStats as dsTable } from "./db/schema.js";
 import {
   notifySignalParsed,
   notifySignalUnparseable,
@@ -14,7 +14,7 @@ import {
 import { evaluateRiskGate, type GateContext } from "./riskGate.js";
 import { executeSignal } from "./executor.js";
 import { getLastPrice, getWalletBalanceUsdt } from "./bybit.js";
-import { getConfigNumber, getConfigBool, getConfigCsv } from "./configStore.js";
+import { getAllConfig } from "./configStore.js";
 import { and, eq, inArray, sql as drizzleSql } from "drizzle-orm";
 
 /**
@@ -110,59 +110,46 @@ function extractSenderId(msg: { senderId?: unknown }): number | null {
 
 async function executeWithGate(intent: SignalIntent, signalId: string): Promise<void> {
   try {
-    const [
-      maxOpen,
-      dailyLossPct,
-      maxDrawdownPct,
-      chaseTolerancePct,
-      minRrRatio,
-      maxRiskPct,
-      maxLeverage,
-      chaseTimeoutMin,
-      dryRun,
-      whitelist,
-    ] = await Promise.all([
-      getConfigNumber("MAX_OPEN_POSITIONS"),
-      getConfigNumber("DAILY_LOSS_LIMIT_PCT"),
-      getConfigNumber("MAX_DRAWDOWN_PCT"),
-      getConfigNumber("CHASE_TOLERANCE_PCT"),
-      getConfigNumber("MIN_RR_RATIO"),
-      getConfigNumber("MAX_RISK_PCT"),
-      getConfigNumber("MAX_LEVERAGE"),
-      getConfigNumber("CHASE_TIMEOUT_MIN"),
-      getConfigBool("DRY_RUN"),
-      getConfigCsv("WHITELIST_SYMBOLS"),
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    const [cfg, stateRows, openCountRows, todayRows] = await Promise.all([
+      getAllConfig(),
+      db.select().from(ssTable).where(eq(ssTable.id, 1)).limit(1),
+      db
+        .select({ c: drizzleSql<number>`count(*)::int` })
+        .from(tradesTable)
+        .where(and(eq(tradesTable.dryRun, false), inArray(tradesTable.status, ["PENDING_FILL", "OPEN"]))),
+      db.select().from(dsTable).where(eq(dsTable.day, todayStr)).limit(1),
     ]);
 
-    const stateRows = await db.select().from(ssTable).where(eq(ssTable.id, 1)).limit(1);
     const state = stateRows[0];
     if (!state) {
       logger.warn("system_state row missing, skipping execute");
       return;
     }
 
-    const openCountRows = await db
-      .select({ c: drizzleSql<number>`count(*)::int` })
-      .from(tradesTable)
-      .where(and(eq(tradesTable.dryRun, false), inArray(tradesTable.status, ["PENDING_FILL", "OPEN"])));
     const openCount = openCountRows[0]?.c ?? 0;
-
     const initialCapital = Number(state.initialCapital ?? 0);
-    const balanceUsdt = config.BYBIT_API_KEY
-      ? await getWalletBalanceUsdt().catch(() => initialCapital)
-      : initialCapital;
-    const lastPrice = config.BYBIT_API_KEY
-      ? await getLastPrice(intent.symbol).catch(() => (intent.entryLow + intent.entryHigh) / 2)
-      : (intent.entryLow + intent.entryHigh) / 2;
+    const dayPnl = Number(todayRows[0]?.pnlUsdt ?? 0);
+    const dayBalanceStart = Number(todayRows[0]?.balanceStart ?? initialCapital);
+
+    const [balanceUsdt, lastPrice] = await Promise.all([
+      config.BYBIT_API_KEY
+        ? getWalletBalanceUsdt().catch(() => initialCapital)
+        : Promise.resolve(initialCapital),
+      config.BYBIT_API_KEY
+        ? getLastPrice(intent.symbol).catch(() => (intent.entryLow + intent.entryHigh) / 2)
+        : Promise.resolve((intent.entryLow + intent.entryHigh) / 2),
+    ]);
 
     const gateCtx: GateContext = {
       config: {
-        MAX_OPEN_POSITIONS: maxOpen,
-        DAILY_LOSS_LIMIT_PCT: dailyLossPct,
-        MAX_DRAWDOWN_PCT: maxDrawdownPct,
-        CHASE_TOLERANCE_PCT: chaseTolerancePct,
-        MIN_RR_RATIO: minRrRatio,
-        WHITELIST_SYMBOLS: whitelist,
+        MAX_OPEN_POSITIONS: Number(cfg.MAX_OPEN_POSITIONS),
+        DAILY_LOSS_LIMIT_PCT: Number(cfg.DAILY_LOSS_LIMIT_PCT),
+        MAX_DRAWDOWN_PCT: Number(cfg.MAX_DRAWDOWN_PCT),
+        CHASE_TOLERANCE_PCT: Number(cfg.CHASE_TOLERANCE_PCT),
+        MIN_RR_RATIO: Number(cfg.MIN_RR_RATIO),
+        WHITELIST_SYMBOLS: cfg.WHITELIST_SYMBOLS.split(",").map((s) => s.trim()).filter(Boolean),
       },
       state: {
         killed: state.killed,
@@ -172,25 +159,13 @@ async function executeWithGate(intent: SignalIntent, signalId: string): Promise<
       },
       balance: balanceUsdt,
       openCount,
-      dayPnl: 0,
-      dayBalanceStart: initialCapital,
+      dayPnl,
+      dayBalanceStart,
       lastPrice,
       now: new Date(),
     };
 
-    const gate = evaluateRiskGate(
-      {
-        signalHash: intent.signalHash,
-        direction: intent.direction,
-        symbol: intent.symbol,
-        entryLow: intent.entryLow,
-        entryHigh: intent.entryHigh,
-        stopLoss: intent.stopLoss,
-        takeProfit1: intent.takeProfit1,
-        leverageRaw: intent.leverageRaw,
-      },
-      gateCtx
-    );
+    const gate = evaluateRiskGate(intent, gateCtx);
 
     if (!gate.ok) {
       logger.info("Gate rejected", { signalHash: intent.signalHash, reason: gate.reason });
@@ -198,26 +173,16 @@ async function executeWithGate(intent: SignalIntent, signalId: string): Promise<
     }
 
     await executeSignal(
+      { ...intent, signalId },
       {
-        signalId,
-        signalHash: intent.signalHash,
-        direction: intent.direction,
-        symbol: intent.symbol,
-        entryLow: intent.entryLow,
-        entryHigh: intent.entryHigh,
-        stopLoss: intent.stopLoss,
-        takeProfit1: intent.takeProfit1,
-        leverageRaw: intent.leverageRaw,
-      },
-      {
-        dryRun,
-        maxLeverage,
-        maxRiskPct,
+        dryRun: cfg.DRY_RUN === "true",
+        maxLeverage: Number(cfg.MAX_LEVERAGE),
+        maxRiskPct: Number(cfg.MAX_RISK_PCT),
         balanceUsdt,
         lastPrice,
         entryStrategy: gate.entryStrategy,
         limitPrice: gate.limitPrice,
-        chaseTimeoutMin,
+        chaseTimeoutMin: Number(cfg.CHASE_TIMEOUT_MIN),
       }
     );
   } catch (e) {

@@ -103,7 +103,7 @@ export async function buildServer() {
   app.get(
     "/api/copy/trades",
     { preHandler: authPreHandler },
-    async (req) => {
+    async (req): Promise<import("@dca/shared").CopyTradesPage> => {
       const q = req.query as { page?: string; pageSize?: string; status?: string; includeDryRun?: string };
       const page = Math.max(1, Number(q.page ?? "1"));
       const pageSize = Math.min(200, Math.max(1, Number(q.pageSize ?? "50")));
@@ -133,13 +133,13 @@ export async function buildServer() {
           id: r.id,
           signalId: r.signalId,
           symbol: r.symbol,
-          direction: r.direction,
+          direction: r.direction as "LONG" | "SHORT",
           bybitOrderId: r.bybitOrderId,
           bybitOrderLinkId: r.bybitOrderLinkId,
           plannedQty: r.plannedQty,
           plannedMargin: r.plannedMargin,
           leverageUsed: r.leverageUsed,
-          entryStrategy: r.entryStrategy,
+          entryStrategy: r.entryStrategy as "MARKET" | "LIMIT_CHASE",
           limitPrice: r.limitPrice,
           limitExpiresAt: r.limitExpiresAt?.toISOString() ?? null,
           filledQty: r.filledQty,
@@ -147,7 +147,7 @@ export async function buildServer() {
           fillTs: r.fillTs?.toISOString() ?? null,
           tpPrice: r.tpPrice,
           slPrice: r.slPrice,
-          status: r.status,
+          status: r.status as import("@dca/shared").CopyTradeStatus,
           closeReason: r.closeReason,
           exitPrice: r.exitPrice,
           closeTs: r.closeTs?.toISOString() ?? null,
@@ -164,32 +164,30 @@ export async function buildServer() {
 
   app.get("/api/copy/stats", { preHandler: authPreHandler }, async () => {
     const todayStr = new Date().toISOString().slice(0, 10);
-    const todayRows = await db
-      .select()
-      .from(dailyStats)
-      .where(eq(dailyStats.day, todayStr))
-      .limit(1);
-    const last7 = await db
-      .select({
-        pnl: sql<number>`COALESCE(SUM(${dailyStats.pnlUsdt}::numeric), 0)::float`,
-        closed: sql<number>`COALESCE(SUM(${dailyStats.tradesClosed}), 0)::int`,
-      })
-      .from(dailyStats)
-      .where(sql`${dailyStats.day} > current_date - INTERVAL '7 days'`);
-    const allTime = await db
-      .select({
-        pnl: sql<number>`COALESCE(SUM(${dailyStats.pnlUsdt}::numeric), 0)::float`,
-        closed: sql<number>`COALESCE(SUM(${dailyStats.tradesClosed}), 0)::int`,
-      })
-      .from(dailyStats);
-    const wins = await db
-      .select({ c: sql<number>`count(*)::int` })
-      .from(trades)
-      .where(and(eq(trades.dryRun, false), inArray(trades.status, ["CLOSED_TP"])));
-    const losses = await db
-      .select({ c: sql<number>`count(*)::int` })
-      .from(trades)
-      .where(and(eq(trades.dryRun, false), inArray(trades.status, ["CLOSED_SL", "LIQUIDATED"])));
+    const [todayRows, last7, allTime, wins, losses] = await Promise.all([
+      db.select().from(dailyStats).where(eq(dailyStats.day, todayStr)).limit(1),
+      db
+        .select({
+          pnl: sql<number>`COALESCE(SUM(${dailyStats.pnlUsdt}::numeric), 0)::float`,
+          closed: sql<number>`COALESCE(SUM(${dailyStats.tradesClosed}), 0)::int`,
+        })
+        .from(dailyStats)
+        .where(sql`${dailyStats.day} > current_date - INTERVAL '7 days'`),
+      db
+        .select({
+          pnl: sql<number>`COALESCE(SUM(${dailyStats.pnlUsdt}::numeric), 0)::float`,
+          closed: sql<number>`COALESCE(SUM(${dailyStats.tradesClosed}), 0)::int`,
+        })
+        .from(dailyStats),
+      db
+        .select({ c: sql<number>`count(*)::int` })
+        .from(trades)
+        .where(and(eq(trades.dryRun, false), inArray(trades.status, ["CLOSED_TP"]))),
+      db
+        .select({ c: sql<number>`count(*)::int` })
+        .from(trades)
+        .where(and(eq(trades.dryRun, false), inArray(trades.status, ["CLOSED_SL", "LIQUIDATED"]))),
+    ]);
 
     return {
       today: {
