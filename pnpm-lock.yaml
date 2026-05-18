@@ -87,6 +87,12 @@ importers:
       '@fastify/jwt':
         specifier: ^10.0.0
         version: 10.0.0
+      axios:
+        specifier: ^1.15.0
+        version: 1.15.0
+      bullmq:
+        specifier: ^5.73.5
+        version: 5.73.5
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(postgres@3.4.9)
@@ -96,6 +102,9 @@ importers:
       input:
         specifier: ^1.0.1
         version: 1.0.1
+      ioredis:
+        specifier: ^5.10.1
+        version: 5.10.1
       postgres:
         specifier: ^3.4.9
         version: 3.4.9
