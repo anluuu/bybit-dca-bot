@@ -1,5 +1,5 @@
 import axios from "axios";
-import { logger } from "../logger.js";
+import { logger } from "../../logger.js";
 import { cacheGet, cacheSet } from "./cache.js";
 
 /**

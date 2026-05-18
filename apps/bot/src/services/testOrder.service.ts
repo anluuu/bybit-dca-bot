@@ -1,8 +1,8 @@
 import { sql } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { orders } from "../db/schema.js";
-import { getTickerPrice } from "../exchange.js";
-import { getMonthlySpent } from "../spending.js";
+import { getTickerPrice } from "../infra/exchange.js";
+import { getMonthlySpent } from "../domain/spending.js";
 import { config } from "../config.js";
 import type { Asset } from "../db/schema.js";
 

@@ -1,6 +1,6 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 import type { CopyConfig } from "@dca/shared";
-import { getAllConfig, setConfig } from "../configStore.js";
+import { getAllConfig, setConfig } from "../infra/configStore.js";
 
 export async function getConfig(): Promise<CopyConfig> {
   return await getAllConfig();

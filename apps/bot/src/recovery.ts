@@ -1,8 +1,8 @@
 import { eq, and, isNotNull, sql } from "drizzle-orm";
 import { db } from "./db/client.js";
 import { orders } from "./db/schema.js";
-import { getOrderDetail, ExchangeClientError } from "./exchange.js";
-import { notifySuccess } from "./notifications.js";
+import { getOrderDetail, ExchangeClientError } from "./infra/exchange.js";
+import { notifySuccess } from "./infra/notifications.js";
 import { logger } from "./logger.js";
 
 /**

@@ -1,6 +1,6 @@
 import { Telegraf } from "telegraf";
-import { config } from "./config.js";
-import { logger } from "./logger.js";
+import { config } from "../config.js";
+import { logger } from "../logger.js";
 
 let bot: Telegraf | null = null;
 

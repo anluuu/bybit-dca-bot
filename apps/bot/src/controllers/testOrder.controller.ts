@@ -5,8 +5,8 @@ import {
   findBusyReason,
   buildTestPreview,
 } from "../services/testOrder.service.js";
-import { executeTestOrder } from "../strategy.js";
-import { ExchangeClientError } from "../exchange.js";
+import { executeTestOrder } from "../domain/strategy.js";
+import { ExchangeClientError } from "../infra/exchange.js";
 import { config } from "../config.js";
 import { logger } from "../logger.js";
 

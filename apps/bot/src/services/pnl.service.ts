@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import type { PortfolioPnl } from "@dca/shared";
 import { db } from "../db/client.js";
 import { orders } from "../db/schema.js";
-import { getPrice } from "../priceCache.js";
+import { getPrice } from "../infra/priceCache.js";
 
 export async function getPnl(pair: string): Promise<PortfolioPnl> {
   const [agg] = await db

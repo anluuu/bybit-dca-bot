@@ -1,15 +1,15 @@
-import { db } from "./db/client.js";
-import { trades, signals } from "./db/schema.js";
+import { db } from "../db/client.js";
+import { trades, signals } from "../db/schema.js";
 import { eq } from "drizzle-orm";
-import { logger } from "./logger.js";
+import { logger } from "../logger.js";
 import {
   createOrder,
   setLeverage,
   setMarginModeIsolated,
   ExchangeApiError,
   ExchangeClientError,
-} from "./bybit.js";
-import { getInstrumentSpec } from "./instrumentInfo.js";
+} from "../infra/bybit.js";
+import { getInstrumentSpec } from "../infra/instrumentInfo.js";
 import { computePositionPlan } from "./sizing.js";
 
 export type ExecutorSignal = {

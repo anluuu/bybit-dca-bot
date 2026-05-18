@@ -1,5 +1,5 @@
 import type { SignalFallback } from "@dca/shared";
-import { logger } from "../logger.js";
+import { logger } from "../../logger.js";
 import { cacheGet, cacheSet } from "./cache.js";
 import { computeMayer, type MayerSignal } from "./mayer.js";
 import { computeMa200w, type Ma200wSignal } from "./ma200w.js";

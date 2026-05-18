@@ -1,7 +1,7 @@
 import { Queue, Worker, type Processor } from "bullmq";
 import { Redis } from "ioredis";
-import { config } from "./config.js";
-import { logger } from "./logger.js";
+import { config } from "../config.js";
+import { logger } from "../logger.js";
 
 const connection = new Redis(config.REDIS_URL, {
   maxRetriesPerRequest: null,

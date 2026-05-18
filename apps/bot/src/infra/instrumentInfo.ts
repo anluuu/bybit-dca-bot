@@ -1,5 +1,5 @@
 import axios from "axios";
-import { logger } from "./logger.js";
+import { logger } from "../logger.js";
 import { ExchangeApiError, ExchangeClientError } from "./exchange.js";
 
 export interface InstrumentInfo {

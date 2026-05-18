@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 // Mock the bybit client surface used by executor.
-vi.mock("./bybit.js", () => ({
+vi.mock("../infra/bybit.js", () => ({
   ExchangeApiError: class extends Error {},
   ExchangeClientError: class extends Error {},
   setLeverage: vi.fn(async () => undefined),
@@ -11,7 +11,7 @@ vi.mock("./bybit.js", () => ({
   getWalletBalanceUsdt: vi.fn(async () => 1000),
 }));
 
-vi.mock("./instrumentInfo.js", () => ({
+vi.mock("../infra/instrumentInfo.js", () => ({
   getInstrumentSpec: vi.fn(async () => ({
     symbol: "BTCUSDT",
     qtyStep: 0.001,
@@ -23,7 +23,7 @@ vi.mock("./instrumentInfo.js", () => ({
 
 // Drizzle insert is a chain; mock returns the inserted row id.
 const insertedRows: any[] = [];
-vi.mock("./db/client.js", () => {
+vi.mock("../db/client.js", () => {
   return {
     db: {
       insert: () => ({
@@ -44,7 +44,7 @@ vi.mock("./db/client.js", () => {
 });
 
 import { executeSignal, type ExecutorSignal } from "./executor.js";
-import { createOrder, setLeverage } from "./bybit.js";
+import { createOrder, setLeverage } from "../infra/bybit.js";
 
 const sig: ExecutorSignal = {
   signalId: "sig-1",

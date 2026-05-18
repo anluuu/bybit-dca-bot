@@ -1,17 +1,17 @@
 import { config } from "./config.js";
 import { logger } from "./logger.js";
 import { runMigrations } from "./db/migrate.js";
-import { initNotifier, verifyChat, notifyLifecycle } from "./notifications.js";
-import { startListener, stopListener } from "./listener.js";
+import { initNotifier, verifyChat, notifyLifecycle } from "./infra/notifications.js";
+import { startListener, stopListener } from "./domain/listener.js";
 import { reconcileRecentMessages } from "./recovery.js";
 import { startServer } from "./server.js";
 import { db } from "./db/client.js";
 import { systemState } from "./db/schema.js";
 import { eq } from "drizzle-orm";
-import { seedDefaults } from "./configStore.js";
-import { registerWatcherRepeatable, startWatcherWorker, closeQueue } from "./queue.js";
-import { watcherTick } from "./watcher.js";
-import { getWalletBalanceUsdt } from "./bybit.js";
+import { seedDefaults } from "./infra/configStore.js";
+import { registerWatcherRepeatable, startWatcherWorker, closeQueue } from "./infra/queue.js";
+import { watcherTick } from "./domain/watcher.js";
+import { getWalletBalanceUsdt } from "./infra/bybit.js";
 
 async function ensureSystemStateRow(): Promise<void> {
   const existing = await db.select().from(systemState).where(eq(systemState.id, 1)).limit(1);

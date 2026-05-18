@@ -1,7 +1,7 @@
 import axios, { type AxiosInstance, type InternalAxiosRequestConfig } from "axios";
 import crypto from "node:crypto";
-import { config } from "./config.js";
-import { logger } from "./logger.js";
+import { config } from "../config.js";
+import { logger } from "../logger.js";
 
 export class ExchangeApiError extends Error {
   constructor(message: string, public retCode?: number) {

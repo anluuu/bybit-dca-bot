@@ -1,5 +1,5 @@
 import type { Redis } from "ioredis";
-import { logger } from "../logger.js";
+import { logger } from "../../logger.js";
 
 /**
  * Signal data cache backed by the shared Redis connection.

@@ -1,4 +1,4 @@
-import type { InstrumentSpec } from "./instrumentInfo.js";
+import type { InstrumentSpec } from "../infra/instrumentInfo.js";
 
 export type SizingInput = {
   balanceUsdt: number;

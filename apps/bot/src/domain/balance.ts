@@ -3,9 +3,9 @@ import {
   getFundingBalance,
   getSpotBalance,
   transferFundingToSpot,
-} from "./exchange.js";
-import { logger } from "./logger.js";
-import { notifyTransfer } from "./notifications.js";
+} from "../infra/exchange.js";
+import { logger } from "../logger.js";
+import { notifyTransfer } from "../infra/notifications.js";
 
 export class InsufficientFundsError extends ExchangeClientError {
   constructor(

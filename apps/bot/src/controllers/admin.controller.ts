@@ -4,7 +4,7 @@ import type { AdminRunNowResult } from "@dca/shared";
 import { findAssetByPair } from "../services/assets.service.js";
 import { findBusyReason } from "../services/testOrder.service.js";
 import { fireAndForgetDca } from "../services/admin.service.js";
-import { notifyPing } from "../notifications.js";
+import { notifyPing } from "../infra/notifications.js";
 
 const runNowBodySchema = z.object({
   pair: z.string().min(1).max(20),

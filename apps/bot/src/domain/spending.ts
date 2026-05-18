@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
-import { db } from "./db/client.js";
-import { orders } from "./db/schema.js";
+import { db } from "../db/client.js";
+import { orders } from "../db/schema.js";
 
 export async function getMonthlySpent(pair: string): Promise<number> {
   const now = new Date();

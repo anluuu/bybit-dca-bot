@@ -1,7 +1,7 @@
-import { db } from "./db/client.js";
-import { configTable } from "./db/schema.js";
+import { db } from "../db/client.js";
+import { configTable } from "../db/schema.js";
 import { eq } from "drizzle-orm";
-import { logger } from "./logger.js";
+import { logger } from "../logger.js";
 
 // Default values, applied by `seedDefaults()` on boot when the table is empty.
 // Keys mirror spec section 6 (Mutable config) — units are already encoded

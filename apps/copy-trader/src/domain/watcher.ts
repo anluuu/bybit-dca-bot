@@ -1,14 +1,14 @@
-import { db } from "./db/client.js";
-import { trades, dailyStats, systemState } from "./db/schema.js";
+import { db } from "../db/client.js";
+import { trades, dailyStats, systemState } from "../db/schema.js";
 import { eq, and, inArray, sql } from "drizzle-orm";
-import { logger } from "./logger.js";
+import { logger } from "../logger.js";
 import {
   getOrderByLinkId,
   getPosition,
   getRecentExecutions,
-} from "./bybit.js";
-import { getConfigNumber } from "./configStore.js";
-import { notifyLifecycle } from "./notifications.js";
+} from "../infra/bybit.js";
+import { getConfigNumber } from "../infra/configStore.js";
+import { notifyLifecycle } from "../infra/notifications.js";
 
 const ACTIVE_STATUSES = ["PENDING_FILL", "OPEN"] as const;
 

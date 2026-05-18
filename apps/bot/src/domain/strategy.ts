@@ -1,13 +1,13 @@
 import { UnrecoverableError } from "bullmq";
-import { db } from "./db/client.js";
-import { orders, type Asset, type Order } from "./db/schema.js";
+import { db } from "../db/client.js";
+import { orders, type Asset, type Order } from "../db/schema.js";
 import {
   placeMarketOrder,
   getOrderDetail,
   ExchangeClientError,
   ExchangeApiError,
   type OrderDetail,
-} from "./exchange.js";
+} from "../infra/exchange.js";
 import { getMonthlySpent } from "./spending.js";
 import {
   ensureSpotBalance,
@@ -18,9 +18,9 @@ import {
   notifyFailure,
   notifyCapReached,
   notifyInsufficientFunds,
-} from "./notifications.js";
+} from "../infra/notifications.js";
 import { getCompositeSignal, type CompositeSignal } from "./signals/compose.js";
-import { logger } from "./logger.js";
+import { logger } from "../logger.js";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

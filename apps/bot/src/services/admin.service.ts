@@ -1,7 +1,7 @@
 import { db } from "../db/client.js";
 import { orders } from "../db/schema.js";
-import { executeDca } from "../strategy.js";
-import { notifyFailure } from "../notifications.js";
+import { executeDca } from "../domain/strategy.js";
+import { notifyFailure } from "../infra/notifications.js";
 import { logger } from "../logger.js";
 import type { Asset } from "../db/schema.js";
 

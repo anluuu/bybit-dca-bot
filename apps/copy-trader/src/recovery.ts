@@ -2,7 +2,7 @@ import { TelegramClient } from "telegram";
 import { Api } from "telegram";
 import { config } from "./config.js";
 import { logger } from "./logger.js";
-import { ingestSignalText, isInTargetTopic } from "./listener.js";
+import { ingestSignalText, isInTargetTopic } from "./domain/listener.js";
 
 /**
  * Read the most recent `BOOT_RECONCILE_LIMIT` messages from the signal channel

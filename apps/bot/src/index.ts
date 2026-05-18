@@ -3,11 +3,11 @@ import { db } from "./db/client.js";
 import { sql } from "./db/client.js";
 import { runMigrations } from "./db/migrate.js";
 import { assets } from "./db/schema.js";
-import { createRedisConnection, setupQueue, registerJobs } from "./queue.js";
+import { createRedisConnection, setupQueue, registerJobs } from "./infra/queue.js";
 import { startServer } from "./server.js";
-import { initBot, verifyTelegramChat } from "./notifications.js";
-import { initSignalsCache } from "./signals/cache.js";
-import { warmInstrumentCache } from "./instrumentInfo.js";
+import { initBot, verifyTelegramChat } from "./infra/notifications.js";
+import { initSignalsCache } from "./domain/signals/cache.js";
+import { warmInstrumentCache } from "./infra/instrumentInfo.js";
 import { reconcilePendingOrders } from "./recovery.js";
 import { logger } from "./logger.js";
 

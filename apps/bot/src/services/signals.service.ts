@@ -1,6 +1,6 @@
 import type { PublicSignals } from "@dca/shared";
-import { getCompositeSignal } from "../signals/compose.js";
-import { getMonthlySpent } from "../spending.js";
+import { getCompositeSignal } from "../domain/signals/compose.js";
+import { getMonthlySpent } from "../domain/spending.js";
 import type { Asset } from "../db/schema.js";
 
 export async function getPublicSignals(asset: Asset): Promise<PublicSignals> {
