@@ -78,7 +78,7 @@ async function handleEvent(event: NewMessageEvent): Promise<void> {
  * topic) or replyToMsgId (the initial post of the topic) carries the topic's
  * root message id. Unset env = passthrough.
  */
-function isInTargetTopic(msg: { replyTo?: unknown }): boolean {
+export function isInTargetTopic(msg: { replyTo?: unknown }): boolean {
   if (config.SIGNAL_TOPIC_ID == null) return true;
   const rt = msg.replyTo as
     | { replyToTopId?: number; replyToMsgId?: number; forumTopic?: boolean }
