@@ -96,7 +96,9 @@ export function notifySignalUnparseable(args: {
 
 export function notifyLifecycle(stage: string, detail?: string): Promise<void> {
   return safeAsync(async () => {
-    const body = `*copy-trader ${escapeMd(stage)}*` + (detail ? `\n${escapeMd(detail)}` : "");
-    await send(body);
+    // Plain text — "copy-trader" itself contains a hyphen which is reserved
+    // in MarkdownV2, and operator lifecycle pings don't need formatting.
+    const body = `copy-trader ${stage}` + (detail ? `\n${detail}` : "");
+    await send(body, { plain: true });
   });
 }
