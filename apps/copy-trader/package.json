@@ -1,0 +1,37 @@
+{
+  "name": "@dca/copy-trader",
+  "version": "1.0.0",
+  "description": "Telegram signal copy-trader for Bybit perp futures",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "auth": "tsx src/scripts/auth.ts"
+  },
+  "dependencies": {
+    "@dca/shared": "workspace:*",
+    "@fastify/cookie": "^11.0.2",
+    "@fastify/jwt": "^10.0.0",
+    "drizzle-orm": "^0.45.2",
+    "fastify": "^5.8.4",
+    "input": "^1.0.1",
+    "postgres": "^3.4.9",
+    "telegraf": "^4.16.3",
+    "telegram": "^2.26.22",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2",
+    "vitest": "^3.2.0"
+  }
+}
