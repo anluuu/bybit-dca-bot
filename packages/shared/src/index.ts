@@ -271,3 +271,35 @@ export interface PortfolioPnl {
   avgVsSpotPct: number | null;
   generatedAt: string;
 }
+
+// ============================================================================
+// Copy-trader types (F0 only ships CopySignal; trades/stats added in F1/F2)
+// ============================================================================
+
+export type CopySignalStatus = "PARSED" | "UNPARSEABLE" | "SKIPPED" | "EXECUTED";
+
+export interface CopySignal {
+  id: string;
+  signalHash: string;
+  rawText: string;
+  telegramMsgId: number;
+  receivedAt: string;
+  direction: "LONG" | "SHORT" | null;
+  symbol: string | null;
+  entryLow: string | null;
+  entryHigh: string | null;
+  stopLoss: string | null;
+  leverageRaw: number | null;
+  takeProfit1: string | null;
+  takeProfit2: string | null;
+  takeProfit3: string | null;
+  status: CopySignalStatus;
+  skipReason: string | null;
+}
+
+export interface CopySignalsPage {
+  page: number;
+  pageSize: number;
+  total: number;
+  items: CopySignal[];
+}
