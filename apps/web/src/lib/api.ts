@@ -20,4 +20,7 @@ export type {
   PublicSignals,
   PortfolioPnl,
   SignalFallback,
+  CopySignal,
+  CopySignalsPage,
+  CopySignalStatus,
 } from "@dca/shared";

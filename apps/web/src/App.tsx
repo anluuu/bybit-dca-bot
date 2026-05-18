@@ -24,6 +24,7 @@ import { TelegramPingCard } from "./components/TelegramPingCard.tsx";
 import { LoginPage } from "./components/LoginPage.tsx";
 import { ErrorBoundary } from "./components/ErrorBoundary.tsx";
 import { AuthProvider, useAuth } from "./lib/auth.tsx";
+import { CopyTraderPage } from "./pages/CopyTraderPage.tsx";
 import type {
   Asset,
   OrdersPage,
@@ -251,6 +252,7 @@ function LanguageSwitcher() {
 function AdminDashboard() {
   const { t } = useTranslation();
   const { user, logout } = useAuth();
+  const [view, setView] = useState<"dca" | "copy">("dca");
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<OrderFilters>(DEFAULT_ADMIN_FILTERS);
   const { data: ordersPage, error: ordersError } = useOrders(page, 25, filters);
@@ -298,62 +300,83 @@ function AdminDashboard() {
         </div>
       </header>
 
-      {apiError && <ErrorBanner message={apiError.message} />}
-
-      {summary && health && (
-        <div className="mb-6 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          <StatusCard health={health} asset={assets?.[0]} />
-          <SpendingCard summary={summary} />
-          {pnl && <PortfolioCard pnl={pnl} />}
-        </div>
-      )}
-
-      <div className="mb-6">
-        <SignalsPanel data={signals} />
+      <div className="mb-6 flex gap-2">
+        <button
+          className={`rounded px-3 py-1 text-sm ${view === "dca" ? "bg-amber-glow text-black" : "bg-surface-2"}`}
+          onClick={() => setView("dca")}
+        >
+          DCA
+        </button>
+        <button
+          className={`rounded px-3 py-1 text-sm ${view === "copy" ? "bg-amber-glow text-black" : "bg-surface-2"}`}
+          onClick={() => setView("copy")}
+        >
+          Copy Trader
+        </button>
       </div>
 
-      {ordersPage && (
+      {view === "dca" && (
         <>
-          <div className="mb-6">
-            <AccumulationChart orders={ordersPage.data} />
-          </div>
-          {monthly && (
-            <div className="mb-6">
-              <MonthlyOverview data={monthly} variant="admin" />
+          {apiError && <ErrorBanner message={apiError.message} />}
+
+          {summary && health && (
+            <div className="mb-6 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+              <StatusCard health={health} asset={assets?.[0]} />
+              <SpendingCard summary={summary} />
+              {pnl && <PortfolioCard pnl={pnl} />}
             </div>
           )}
+
           <div className="mb-6">
-            <OrdersTable
-              orders={ordersPage.data}
-              page={ordersPage.page}
-              totalPages={ordersPage.totalPages}
-              total={ordersPage.total}
-              onPageChange={setPage}
-              filters={filters}
-              onFiltersChange={(next) => {
-                setFilters(next);
-                // Reset to page 1 when filters change — filtered totalPages
-                // may be smaller than current `page`, which would otherwise
-                // render an empty past-the-end view.
-                setPage(1);
-              }}
-            />
+            <SignalsPanel data={signals} />
           </div>
+
+          {ordersPage && (
+            <>
+              <div className="mb-6">
+                <AccumulationChart orders={ordersPage.data} />
+              </div>
+              {monthly && (
+                <div className="mb-6">
+                  <MonthlyOverview data={monthly} variant="admin" />
+                </div>
+              )}
+              <div className="mb-6">
+                <OrdersTable
+                  orders={ordersPage.data}
+                  page={ordersPage.page}
+                  totalPages={ordersPage.totalPages}
+                  total={ordersPage.total}
+                  onPageChange={setPage}
+                  filters={filters}
+                  onFiltersChange={(next) => {
+                    setFilters(next);
+                    // Reset to page 1 when filters change — filtered totalPages
+                    // may be smaller than current `page`, which would otherwise
+                    // render an empty past-the-end view.
+                    setPage(1);
+                  }}
+                />
+              </div>
+            </>
+          )}
+
+          {assets?.[0] && ordersPage && (
+            <div className="mb-6 grid gap-6 md:grid-cols-2">
+              <RunNowCard pair={assets[0].pair} orders={ordersPage.data} />
+              <TelegramPingCard />
+            </div>
+          )}
+
+          {assets?.[0] && (
+            <div>
+              <TestOrderCard pair={assets[0].pair} />
+            </div>
+          )}
         </>
       )}
 
-      {assets?.[0] && ordersPage && (
-        <div className="mb-6 grid gap-6 md:grid-cols-2">
-          <RunNowCard pair={assets[0].pair} orders={ordersPage.data} />
-          <TelegramPingCard />
-        </div>
-      )}
-
-      {assets?.[0] && (
-        <div>
-          <TestOrderCard pair={assets[0].pair} />
-        </div>
-      )}
+      {view === "copy" && <CopyTraderPage />}
     </div>
   );
 }
