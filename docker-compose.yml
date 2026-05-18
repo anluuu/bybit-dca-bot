@@ -39,6 +39,39 @@ services:
       - dokploy-network
     restart: unless-stopped
 
+  # ---- Copy Trader (Telegram listener — F0, no execution) - internal only ----
+  copy-trader:
+    build:
+      context: .
+      dockerfile: apps/copy-trader/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - "3001"
+    environment:
+      DATABASE_URL: postgres://dca:${POSTGRES_PASSWORD}@postgres:5432/dca_bot
+      TELEGRAM_API_ID: ${COPY_TG_API_ID}
+      TELEGRAM_API_HASH: ${COPY_TG_API_HASH}
+      TELEGRAM_SESSION_STRING: ${COPY_TG_SESSION_STRING}
+      SIGNAL_CHANNEL_ID: ${COPY_TG_CHANNEL_ID}
+      TELEGRAM_NOTIFY_BOT_TOKEN: ${COPY_NOTIFY_BOT_TOKEN}
+      TELEGRAM_NOTIFY_CHAT_ID: ${COPY_NOTIFY_CHAT_ID}
+      JWT_SECRET: ${JWT_SECRET}
+      PORT: 3001
+      NODE_ENV: production
+      LOG_LEVEL: info
+      BOOT_RECONCILE_LIMIT: 50
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health/live"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - dokploy-network
+    restart: unless-stopped
+
   # ---- Web (React SPA via nginx) - public via Traefik ----
   web:
     build:
@@ -46,6 +79,8 @@ services:
       dockerfile: apps/web/Dockerfile
     depends_on:
       bot:
+        condition: service_healthy
+      copy-trader:
         condition: service_healthy
     expose:
       - "80"
