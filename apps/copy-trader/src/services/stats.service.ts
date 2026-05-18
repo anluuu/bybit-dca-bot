@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { CopyStats } from "@dca/shared";
 import { db } from "../db/client.js";
 import { dailyStats, trades } from "../db/schema.js";
@@ -6,7 +6,7 @@ import { dailyStats, trades } from "../db/schema.js";
 export async function getStats(): Promise<CopyStats> {
   const todayStr = new Date().toISOString().slice(0, 10);
 
-  const [todayRows, last7, allTime, wins, losses] = await Promise.all([
+  const [todayRows, last7, allTime, winLoss] = await Promise.all([
     db.select().from(dailyStats).where(eq(dailyStats.day, todayStr)).limit(1),
     db
       .select({
@@ -22,13 +22,12 @@ export async function getStats(): Promise<CopyStats> {
       })
       .from(dailyStats),
     db
-      .select({ c: sql<number>`count(*)::int` })
+      .select({
+        wins: sql<number>`COUNT(*) FILTER (WHERE ${trades.status} = 'CLOSED_TP')::int`,
+        losses: sql<number>`COUNT(*) FILTER (WHERE ${trades.status} IN ('CLOSED_SL','LIQUIDATED'))::int`,
+      })
       .from(trades)
-      .where(and(eq(trades.dryRun, false), inArray(trades.status, ["CLOSED_TP"]))),
-    db
-      .select({ c: sql<number>`count(*)::int` })
-      .from(trades)
-      .where(and(eq(trades.dryRun, false), inArray(trades.status, ["CLOSED_SL", "LIQUIDATED"]))),
+      .where(eq(trades.dryRun, false)),
   ]);
 
   return {
@@ -38,7 +37,7 @@ export async function getStats(): Promise<CopyStats> {
     },
     last7: { pnlUsdt: last7[0]?.pnl ?? 0, tradesClosed: last7[0]?.closed ?? 0 },
     allTime: { pnlUsdt: allTime[0]?.pnl ?? 0, tradesClosed: allTime[0]?.closed ?? 0 },
-    wins: wins[0]?.c ?? 0,
-    losses: losses[0]?.c ?? 0,
+    wins: winLoss[0]?.wins ?? 0,
+    losses: winLoss[0]?.losses ?? 0,
   };
 }

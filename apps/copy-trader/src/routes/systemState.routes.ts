@@ -23,11 +23,11 @@ export function registerSystemStateRoutes(app: FastifyInstance): void {
     }
   );
 
-  app.post(
+  app.post<{ Body: { reason?: string } }>(
     "/api/copy/admin/kill",
     { preHandler: authPreHandler },
     async (req) => {
-      const reason = (req.body as { reason?: string } | undefined)?.reason ?? "manual";
+      const reason = req.body?.reason ?? "manual";
       await kill(reason);
       return { ok: true };
     }

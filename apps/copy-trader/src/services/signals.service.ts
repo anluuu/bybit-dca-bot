@@ -3,6 +3,7 @@ import type { CopySignalsPage } from "@dca/shared";
 import { db } from "../db/client.js";
 import { signals } from "../db/schema.js";
 import { mapSignalRowToWire } from "../dto/signal.dto.js";
+import { normalizePage } from "../paginate.js";
 
 export interface ListSignalsArgs {
   page: number;
@@ -11,9 +12,7 @@ export interface ListSignalsArgs {
 }
 
 export async function listSignals(args: ListSignalsArgs): Promise<CopySignalsPage> {
-  const page = Math.max(1, args.page);
-  const pageSize = Math.min(200, Math.max(1, args.pageSize));
-  const offset = (page - 1) * pageSize;
+  const { page, pageSize, offset } = normalizePage(args.page, args.pageSize);
   const where = args.status ? eq(signals.status, args.status) : undefined;
 
   const [rows, total] = await Promise.all([

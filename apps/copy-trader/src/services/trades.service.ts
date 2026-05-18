@@ -3,6 +3,7 @@ import type { CopyTradesPage } from "@dca/shared";
 import { db } from "../db/client.js";
 import { trades } from "../db/schema.js";
 import { mapTradeRowToWire } from "../dto/trade.dto.js";
+import { normalizePage } from "../paginate.js";
 
 export interface ListTradesArgs {
   page: number;
@@ -12,9 +13,7 @@ export interface ListTradesArgs {
 }
 
 export async function listTrades(args: ListTradesArgs): Promise<CopyTradesPage> {
-  const page = Math.max(1, args.page);
-  const pageSize = Math.min(200, Math.max(1, args.pageSize));
-  const offset = (page - 1) * pageSize;
+  const { page, pageSize, offset } = normalizePage(args.page, args.pageSize);
 
   const conditions: SQL[] = [];
   if (args.status) conditions.push(eq(trades.status, args.status));
