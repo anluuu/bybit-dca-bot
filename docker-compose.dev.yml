@@ -39,6 +39,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
       - "3001:3001"
     environment:
@@ -54,6 +56,11 @@ services:
       NODE_ENV: development
       LOG_LEVEL: debug
       BOOT_RECONCILE_LIMIT: 50
+      REDIS_URL: redis://redis:6379
+      BYBIT_API_KEY: ${COPY_BYBIT_API_KEY:-}
+      BYBIT_API_SECRET: ${COPY_BYBIT_API_SECRET:-}
+      BYBIT_TESTNET: ${COPY_BYBIT_TESTNET:-true}
+      INITIAL_CAPITAL_USDT_OVERRIDE: ${COPY_INITIAL_CAPITAL_USDT_OVERRIDE:-0}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3001/health/live"]
       interval: 30s
