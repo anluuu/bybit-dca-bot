@@ -6,11 +6,6 @@ const configSchema = z.object({
   TELEGRAM_API_HASH: z.string().min(1),
   TELEGRAM_SESSION_STRING: z.string().min(1),
   SIGNAL_CHANNEL_ID: z.coerce.number().int(),
-
-  // Optional Telegram forum topic id. When set, only messages posted inside
-  // this topic are ingested. Use it when the source is a Telegram supergroup
-  // with topics (forum) — e.g. "Grupo VIP" → topic "Sinais". Leave empty to
-  // ingest from the whole channel.
   SIGNAL_TOPIC_ID: z.coerce.number().int().optional(),
 
   // Telegram notification bot (separate, telegraf)
@@ -19,6 +14,24 @@ const configSchema = z.object({
 
   // Postgres
   DATABASE_URL: z.string().startsWith("postgres"),
+
+  // Redis (BullMQ for the position watcher)
+  REDIS_URL: z.string().startsWith("redis").default("redis://localhost:6379"),
+
+  // Bybit (perpetual futures sub-account). Empty defaults allow F1 to boot
+  // and dry-run even before the operator has wired the real key — the
+  // executor logs a soft error per attempt and the watcher idles.
+  BYBIT_API_KEY: z.string().default(""),
+  BYBIT_API_SECRET: z.string().default(""),
+  BYBIT_TESTNET: z
+    .union([z.boolean(), z.string()])
+    .default(false)
+    .transform((v) => (typeof v === "boolean" ? v : v === "true")),
+
+  // Optional override of the initial-capital baseline used for max-drawdown
+  // kill switch. When empty, the executor populates system_state.initial_capital
+  // from Bybit's reported wallet balance on first boot.
+  INITIAL_CAPITAL_USDT_OVERRIDE: z.coerce.number().nonnegative().default(0),
 
   // Auth (shared with bot for dashboard SSO)
   JWT_SECRET: z.string().min(32),
