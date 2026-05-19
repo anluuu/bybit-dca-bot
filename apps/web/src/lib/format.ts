@@ -113,3 +113,10 @@ export function formatDateShort(iso: string | Date): string {
 export function formatNextBuy(iso: string | Date): string {
   return dayjs(iso).tz(displayTz()).locale(dayjsLocale()).format("LLLL [·] z");
 }
+
+/** Tailwind class for green/red/neutral signed-number tone. */
+export function pnlTone(n: number): string {
+  if (n > 0) return "text-green-gain";
+  if (n < 0) return "text-red-loss";
+  return "text-surface-300";
+}
