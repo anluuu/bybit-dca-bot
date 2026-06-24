@@ -133,4 +133,15 @@ describe("parseSignal — error paths", () => {
     expect(r.kind).toBe("error");
     if (r.kind === "error") expect(r.reason).toBe("NO_TP1");
   });
+
+  it("parses SOL leverage ranges written as 15-20x", () => {
+    const r = parseSignal(
+      "SHORT SOL\nEntrada: 73 - 74\nSL: 76.15\nAlavancagem: 15-20x\nTP1: 70.80\nTP2: 68\nTP3: 65",
+      1
+    );
+    expect(r.kind).toBe("ok");
+    if (r.kind !== "ok") return;
+    expect(r.intent.symbol).toBe("SOLUSDT");
+    expect(r.intent.leverageRaw).toBe(15);
+  });
 });

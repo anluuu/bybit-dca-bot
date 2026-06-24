@@ -101,7 +101,7 @@ export function parseSignal(rawText: string, telegramMsgId: number): ParseResult
     return { kind: "error", reason: "INVALID_SL", rawText, signalHash, telegramMsgId };
   }
 
-  const levMatch = normalized.match(/Alavancagem:\s*(\d+)x(?:\s*[-–]\s*(\d+)x)?/i);
+  const levMatch = normalized.match(/Alavancagem:\s*(\d+)(?:x)?(?:\s*[-–]\s*(\d+)x)?/i);
   if (!levMatch) {
     return { kind: "error", reason: "NO_LEVERAGE", rawText, signalHash, telegramMsgId };
   }

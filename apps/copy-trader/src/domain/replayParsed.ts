@@ -53,6 +53,8 @@ export function replayInstrumentSpec(symbol: string): InstrumentSpec {
       return { symbol, qtyStep: 0.001, minOrderQty: 0.001, maxOrderQty: 100, tickSize: 0.1 };
     case "ETHUSDT":
       return { symbol, qtyStep: 0.01, minOrderQty: 0.01, maxOrderQty: 1000, tickSize: 0.01 };
+    case "SOLUSDT":
+      return { symbol, qtyStep: 0.1, minOrderQty: 0.1, maxOrderQty: 10000, tickSize: 0.01 };
     default:
       return { symbol, qtyStep: 0.001, minOrderQty: 0.001, maxOrderQty: 100, tickSize: 0.01 };
   }
