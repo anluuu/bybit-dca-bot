@@ -14,7 +14,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
     "auth": "tsx src/scripts/auth.ts",
-    "backfill": "tsx src/scripts/backfill.ts"
+    "backfill": "tsx src/scripts/backfill.ts",
+    "replay-parsed": "tsx src/scripts/replayParsed.ts"
   },
   "dependencies": {
     "@dca/shared": "workspace:*",
