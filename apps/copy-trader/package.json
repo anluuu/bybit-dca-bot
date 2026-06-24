@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
-    "auth": "tsx src/scripts/auth.ts"
+    "auth": "tsx src/scripts/auth.ts",
+    "backfill": "tsx src/scripts/backfill.ts"
   },
   "dependencies": {
     "@dca/shared": "workspace:*",

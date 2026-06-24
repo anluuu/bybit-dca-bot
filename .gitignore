@@ -3,5 +3,6 @@ dist/
 .turbo/
 .env
 .env.test
+.mcp.json
 .DS_Store
 .playwright-mcp/

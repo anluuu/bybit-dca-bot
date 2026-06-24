@@ -1,12 +1,20 @@
 import { z } from "zod/v4";
 
+export const emptyStringToUndefined = (value: unknown): unknown =>
+  value === "" ? undefined : value;
+
+const optionalPositiveInt = z.preprocess(
+  emptyStringToUndefined,
+  z.coerce.number().int().positive().optional()
+);
+
 const configSchema = z.object({
   // Telegram MTProto user session (NOT a bot token)
   TELEGRAM_API_ID: z.coerce.number().int().positive(),
   TELEGRAM_API_HASH: z.string().min(1),
   TELEGRAM_SESSION_STRING: z.string().min(1),
   SIGNAL_CHANNEL_ID: z.coerce.number().int(),
-  SIGNAL_TOPIC_ID: z.coerce.number().int().optional(),
+  SIGNAL_TOPIC_ID: optionalPositiveInt,
 
   // Telegram notification bot (separate, telegraf)
   TELEGRAM_NOTIFY_BOT_TOKEN: z.string().min(1),

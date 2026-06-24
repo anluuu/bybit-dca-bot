@@ -199,11 +199,19 @@ async function executeWithGate(intent: SignalIntent, signalId: string): Promise<
  * function for previously seen messages). Side-effect: Telegram notify on first
  * insert.
  */
+export type IngestSignalOptions = {
+  execute?: boolean;
+  notify?: boolean;
+};
+
 export async function ingestSignalText(
   text: string,
   msgId: number,
-  senderId: number | null = null
+  senderId: number | null = null,
+  options: IngestSignalOptions = {}
 ): Promise<void> {
+  const execute = options.execute ?? true;
+  const notify = options.notify ?? true;
   // Sender whitelist (optional). When the env var is configured, drop messages
   // from anyone not on the list before we even parse — useful when the channel
   // has many members chatting but only one trusted signaler.
@@ -264,15 +272,19 @@ export async function ingestSignalText(
         msgId,
       });
 
-      void notifySignalParsed({
-        direction: i.direction,
-        symbol: i.symbol,
-        entryLow: i.entryLow,
-        entryHigh: i.entryHigh,
-        stopLoss: i.stopLoss,
-        takeProfit1: i.takeProfit1,
-      });
-      void executeWithGate(i, inserted[0].id);
+      if (notify) {
+        void notifySignalParsed({
+          direction: i.direction,
+          symbol: i.symbol,
+          entryLow: i.entryLow,
+          entryHigh: i.entryHigh,
+          stopLoss: i.stopLoss,
+          takeProfit1: i.takeProfit1,
+        });
+      }
+      if (execute) {
+        void executeWithGate(i, inserted[0].id);
+      }
     } else {
       const inserted = await db
         .insert(signals)
@@ -295,11 +307,13 @@ export async function ingestSignalText(
       logger.warn("Signal unparseable", { reason: parsed.reason, msgId });
       // We only reached this branch because the message looked signal-shaped
       // (chat is filtered out by the early-return above).
-      void notifySignalUnparseable({
-        reason: parsed.reason,
-        preview: parsed.rawText,
-        msgId,
-      });
+      if (notify) {
+        void notifySignalUnparseable({
+          reason: parsed.reason,
+          preview: parsed.rawText,
+          msgId,
+        });
+      }
     }
   } catch (error) {
     logger.error("Failed to ingest signal", {
@@ -308,4 +322,3 @@ export async function ingestSignalText(
     });
   }
 }
-
