@@ -5,6 +5,7 @@ import { backfillTelegramHistory, type BackfillMessage } from "../domain/backfil
 import { parseBackfillArgs } from "./backfillArgs.js";
 
 let closeDb: (() => Promise<void>) | undefined;
+let disconnectTelegram: (() => Promise<void>) | undefined;
 
 function printHelp(): void {
   console.log(`Usage: pnpm backfill [options]
@@ -40,6 +41,7 @@ async function main(): Promise<void> {
   );
 
   await client.connect();
+  disconnectTelegram = () => client.disconnect();
   if (!(await client.checkAuthorization())) {
     throw new Error("Telegram session not authorized - regenerate via `pnpm auth`");
   }
@@ -72,5 +74,6 @@ main()
     process.exitCode = 1;
   })
   .finally(async () => {
+    await disconnectTelegram?.().catch(() => undefined);
     await closeDb?.().catch(() => undefined);
   });
