@@ -9,7 +9,7 @@ import {
   ExchangeApiError,
   ExchangeClientError,
 } from "../infra/bybit.js";
-import { getInstrumentSpec } from "../infra/instrumentInfo.js";
+import { getInstrumentSpec, type InstrumentSpec } from "../infra/instrumentInfo.js";
 import { computePositionPlan } from "./sizing.js";
 
 export type ExecutorSignal = {
@@ -33,6 +33,7 @@ export type ExecuteOptions = {
   entryStrategy: "MARKET" | "LIMIT_CHASE";
   limitPrice?: number;
   chaseTimeoutMin?: number;
+  instrumentOverride?: InstrumentSpec;
 };
 
 export async function executeSignal(
@@ -40,7 +41,7 @@ export async function executeSignal(
   opts: ExecuteOptions
 ): Promise<void> {
   const leverageUsed = Math.min(signal.leverageRaw, opts.maxLeverage);
-  const instrument = await getInstrumentSpec(signal.symbol);
+  const instrument = opts.instrumentOverride ?? (await getInstrumentSpec(signal.symbol));
 
   const entryPrice =
     opts.entryStrategy === "LIMIT_CHASE" && opts.limitPrice != null

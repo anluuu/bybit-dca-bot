@@ -1,4 +1,5 @@
 import type { ExecutorSignal } from "./executor.js";
+import type { InstrumentSpec } from "../infra/instrumentInfo.js";
 
 export type ReplayableSignalRow = {
   id: string;
@@ -44,4 +45,15 @@ export function signalToExecutorSignal(signal: ReplayableSignalRow): ExecutorSig
     takeProfit1: requiredNumber(signal.takeProfit1, "takeProfit1"),
     leverageRaw: requiredNumber(signal.leverageRaw, "leverageRaw"),
   };
+}
+
+export function replayInstrumentSpec(symbol: string): InstrumentSpec {
+  switch (symbol) {
+    case "BTCUSDT":
+      return { symbol, qtyStep: 0.001, minOrderQty: 0.001, maxOrderQty: 100, tickSize: 0.1 };
+    case "ETHUSDT":
+      return { symbol, qtyStep: 0.01, minOrderQty: 0.01, maxOrderQty: 1000, tickSize: 0.01 };
+    default:
+      return { symbol, qtyStep: 0.001, minOrderQty: 0.001, maxOrderQty: 100, tickSize: 0.01 };
+  }
 }

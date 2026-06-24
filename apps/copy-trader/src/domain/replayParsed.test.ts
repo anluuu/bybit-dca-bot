@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { signalToExecutorSignal, simulatedEntryPrice } from "./replayParsed.js";
+import { replayInstrumentSpec, signalToExecutorSignal, simulatedEntryPrice } from "./replayParsed.js";
 
 describe("replayParsed helpers", () => {
   it("uses the middle of the entry range as simulated entry price", () => {
@@ -29,6 +29,14 @@ describe("replayParsed helpers", () => {
       stopLoss: 120,
       takeProfit1: 90,
       leverageRaw: 15,
+    });
+  });
+
+  it("provides offline instrument specs for dry-run replay", () => {
+    expect(replayInstrumentSpec("BTCUSDT")).toMatchObject({
+      symbol: "BTCUSDT",
+      qtyStep: 0.001,
+      minOrderQty: 0.001,
     });
   });
 });

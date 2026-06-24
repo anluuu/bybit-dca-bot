@@ -2,7 +2,11 @@ import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { db, sql } from "../db/client.js";
 import { signals } from "../db/schema.js";
 import { executeSignal } from "../domain/executor.js";
-import { signalToExecutorSignal, simulatedEntryPrice } from "../domain/replayParsed.js";
+import {
+  replayInstrumentSpec,
+  signalToExecutorSignal,
+  simulatedEntryPrice,
+} from "../domain/replayParsed.js";
 import { getAllConfig } from "../infra/configStore.js";
 import { logger } from "../logger.js";
 import { parseReplayParsedArgs } from "./replayParsedArgs.js";
@@ -53,6 +57,7 @@ async function main(): Promise<void> {
         balanceUsdt: options.balanceUsdt,
         lastPrice: simulatedEntryPrice(row),
         entryStrategy: "MARKET",
+        instrumentOverride: replayInstrumentSpec(signal.symbol),
       });
       replayed += 1;
     } catch (error) {
