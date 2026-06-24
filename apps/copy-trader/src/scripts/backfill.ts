@@ -60,7 +60,11 @@ async function main(): Promise<void> {
     dryRun: options.dryRun,
     isInTargetTopic,
     ingest: (text, msgId, senderId) =>
-      ingestSignalText(text, msgId, senderId, { execute: false, notify: false }),
+      ingestSignalText(text, msgId, senderId, {
+        execute: false,
+        notify: false,
+        enforceSenderWhitelist: false,
+      }),
   });
 
   logger.info("Telegram backfill complete", stats);

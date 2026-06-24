@@ -13,6 +13,7 @@ import {
 } from "./infra/notifications.js";
 import { evaluateRiskGate, type GateContext } from "./domain/riskGate.js";
 import { executeSignal } from "./domain/executor.js";
+import { isSenderAllowed } from "./domain/senderGate.js";
 import { getLastPrice, getWalletBalanceUsdt } from "./infra/bybit.js";
 import { getAllConfig } from "./infra/configStore.js";
 import { and, eq, inArray, sql as drizzleSql } from "drizzle-orm";
@@ -202,6 +203,7 @@ async function executeWithGate(intent: SignalIntent, signalId: string): Promise<
 export type IngestSignalOptions = {
   execute?: boolean;
   notify?: boolean;
+  enforceSenderWhitelist?: boolean;
 };
 
 export async function ingestSignalText(
@@ -212,12 +214,12 @@ export async function ingestSignalText(
 ): Promise<void> {
   const execute = options.execute ?? true;
   const notify = options.notify ?? true;
+  const enforceSenderWhitelist = options.enforceSenderWhitelist ?? true;
   // Sender whitelist (optional). When the env var is configured, drop messages
   // from anyone not on the list before we even parse — useful when the channel
   // has many members chatting but only one trusted signaler.
   if (
-    config.allowedSenderIds.size > 0 &&
-    (senderId == null || !config.allowedSenderIds.has(senderId))
+    !isSenderAllowed(config.allowedSenderIds, senderId, enforceSenderWhitelist)
   ) {
     logger.info("Skipping message from non-whitelisted sender", { msgId, senderId });
     return;
