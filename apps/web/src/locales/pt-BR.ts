@@ -290,7 +290,7 @@ export const ptBR = {
         entryHigh: "Entrada Max",
         stopLoss: "SL",
         leverage: "Alav",
-        tp1: "TP1",
+        takeProfits: "TPs",
         reason: "Motivo",
       },
       status: {

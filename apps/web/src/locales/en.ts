@@ -285,7 +285,7 @@ export const en: Translations = {
         entryHigh: "Entry High",
         stopLoss: "SL",
         leverage: "Lev",
-        tp1: "TP1",
+        takeProfits: "TPs",
         reason: "Reason",
       },
       status: {

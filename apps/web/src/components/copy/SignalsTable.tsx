@@ -68,7 +68,7 @@ export function SignalsTable() {
               <th className="px-2 py-2 text-right">{t("copy.signals.columns.entryHigh")}</th>
               <th className="px-2 py-2 text-right">{t("copy.signals.columns.stopLoss")}</th>
               <th className="px-2 py-2 text-right">{t("copy.signals.columns.leverage")}</th>
-              <th className="px-2 py-2 text-right">{t("copy.signals.columns.tp1")}</th>
+              <th className="px-2 py-2 text-right">{t("copy.signals.columns.takeProfits")}</th>
               <th className="px-2 py-2 text-left">{t("copy.signals.columns.reason")}</th>
             </tr>
           </thead>
@@ -84,7 +84,11 @@ export function SignalsTable() {
                 <td className="px-2 py-1 text-right">{s.entryHigh ?? "—"}</td>
                 <td className="px-2 py-1 text-right">{s.stopLoss ?? "—"}</td>
                 <td className="px-2 py-1 text-right">{s.leverageRaw ?? "—"}</td>
-                <td className="px-2 py-1 text-right">{s.takeProfit1 ?? "—"}</td>
+                <td className="px-2 py-1 text-right leading-5">
+                  <div>{s.takeProfit1 ? `TP1 ${s.takeProfit1}` : "—"}</div>
+                  {s.takeProfit2 ? <div className="text-gray-400">TP2 {s.takeProfit2}</div> : null}
+                  {s.takeProfit3 ? <div className="text-gray-400">TP3 {s.takeProfit3}</div> : null}
+                </td>
                 <td className="px-2 py-1 text-left text-amber-glow">{s.skipReason ?? ""}</td>
               </tr>
             ))}
